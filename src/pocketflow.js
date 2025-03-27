@@ -62,8 +62,8 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AsyncParallelBatchFlow = exports.AsyncBatchFlow = exports.AsyncFlow = exports.AsyncParallelBatchNode = exports.AsyncBatchNode = exports.AsyncNode = exports.BatchFlow = exports.Flow = exports.BatchNode = exports.Node = exports.BaseNode = void 0;
-// Base Node class with generic types - S (shared) first, P (params) second
+exports.AsyncParallelBatchFlow = exports.AsyncBatchFlow = exports.AsyncFlow = exports.AsyncParallelBatchNode = exports.AsyncBatchNode = exports.AsyncNode = exports.BatchFlow = exports.Flow = exports.BatchNode = exports.RegularNode = exports.BaseNode = void 0;
+// Base Node class with generic types
 var BaseNode = /** @class */ (function () {
     function BaseNode() {
         this.params = {};
@@ -127,10 +127,10 @@ var ConditionalTransition = /** @class */ (function () {
     };
     return ConditionalTransition;
 }());
-// Regular Node with retry capability
-var Node = /** @class */ (function (_super) {
-    __extends(Node, _super);
-    function Node(maxRetries, wait) {
+// RegularNode with retry capability (renamed from Node)
+var RegularNode = /** @class */ (function (_super) {
+    __extends(RegularNode, _super);
+    function RegularNode(maxRetries, wait) {
         if (maxRetries === void 0) { maxRetries = 1; }
         if (wait === void 0) { wait = 0; }
         var _this = _super.call(this) || this;
@@ -139,10 +139,10 @@ var Node = /** @class */ (function (_super) {
         _this.wait = wait;
         return _this;
     }
-    Node.prototype.execFallback = function (prepRes, error) {
+    RegularNode.prototype.execFallback = function (prepRes, error) {
         throw error;
     };
-    Node.prototype._exec = function (prepRes) {
+    RegularNode.prototype._exec = function (prepRes) {
         for (this.currentRetry = 0; this.currentRetry < this.maxRetries; this.currentRetry++) {
             try {
                 return this.exec(prepRes);
@@ -162,9 +162,9 @@ var Node = /** @class */ (function (_super) {
             }
         }
     };
-    return Node;
+    return RegularNode;
 }(BaseNode));
-exports.Node = Node;
+exports.RegularNode = RegularNode;
 // BatchNode for handling iterable inputs
 var BatchNode = /** @class */ (function (_super) {
     __extends(BatchNode, _super);
@@ -176,7 +176,7 @@ var BatchNode = /** @class */ (function (_super) {
         return (items || []).map(function (item) { return _super.prototype._exec.call(_this, item); });
     };
     return BatchNode;
-}(Node));
+}(RegularNode));
 exports.BatchNode = BatchNode;
 // Flow for orchestrating nodes
 var Flow = /** @class */ (function (_super) {
@@ -229,7 +229,6 @@ var Flow = /** @class */ (function (_super) {
 }(BaseNode));
 exports.Flow = Flow;
 // BatchFlow for running flows with different parameters
-// Using P for batch item type and defining params as P
 var BatchFlow = /** @class */ (function (_super) {
     __extends(BatchFlow, _super);
     function BatchFlow() {
@@ -366,7 +365,7 @@ var AsyncNode = /** @class */ (function (_super) {
         });
     };
     return AsyncNode;
-}(Node));
+}(RegularNode));
 exports.AsyncNode = AsyncNode;
 // AsyncBatchNode for batch processing with async operations
 var AsyncBatchNode = /** @class */ (function (_super) {

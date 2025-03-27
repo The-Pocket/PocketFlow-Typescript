@@ -1,7 +1,7 @@
 // Type definitions
 type Action = string;
 
-// Base Node class with generic types - S (shared) first, P (params) second
+// Base Node class with generic types
 class BaseNode<S = any, P = any> {
   params: P = {} as P;
   successors: Map<Action, BaseNode<any, any>> = new Map();
@@ -69,8 +69,8 @@ class ConditionalTransition {
   }
 }
 
-// Regular Node with retry capability
-class Node<S = any, P = any> extends BaseNode<S, P> {
+// RegularNode with retry capability (renamed from Node)
+class RegularNode<S = any, P = any> extends BaseNode<S, P> {
   maxRetries: number;
   wait: number;
   currentRetry: number = 0;
@@ -107,7 +107,7 @@ class Node<S = any, P = any> extends BaseNode<S, P> {
 }
 
 // BatchNode for handling iterable inputs
-class BatchNode<S = any, P = any> extends Node<S, P> {
+class BatchNode<S = any, P = any> extends RegularNode<S, P> {
   _exec(items: any[]): any[] {
     return (items || []).map(item => super._exec(item));
   }
@@ -169,7 +169,6 @@ class Flow<S = any, P = any> extends BaseNode<S, P> {
 }
 
 // BatchFlow for running flows with different parameters
-// Using P for batch item type and defining params as P
 class BatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
   _run(shared: S): Action | undefined {
     // In BatchFlow, prep() should return an array of parameter objects
@@ -186,7 +185,7 @@ class BatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
 }
 
 // AsyncNode for asynchronous operations
-class AsyncNode<S = any, P = any> extends Node<S, P> {
+class AsyncNode<S = any, P = any> extends RegularNode<S, P> {
   prep(shared: S): any {
     throw new Error("Use prepAsync.");
   }
@@ -359,7 +358,7 @@ class AsyncParallelBatchFlow<S = any, P = Record<string, any>> extends AsyncFlow
 // Export all classes
 export {
   BaseNode,
-  Node,
+  RegularNode,  // Renamed from Node
   BatchNode,
   Flow,
   BatchFlow,
