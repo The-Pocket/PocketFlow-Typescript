@@ -18,7 +18,7 @@ class BaseNode<S = any, P = any> {
     return await this._run(shared);
   }
 }
-class AsyncNode<S = any, P = any> extends BaseNode<S, P> {
+class Node<S = any, P = any> extends BaseNode<S, P> {
   maxRetries: number; wait: number; currentRetry: number = 0;
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(); this.maxRetries = maxRetries; this.wait = wait;
@@ -35,13 +35,13 @@ class AsyncNode<S = any, P = any> extends BaseNode<S, P> {
     return undefined;
   }
 }
-class BatchNode<S = any, P = any> extends AsyncNode<S, P> {
+class BatchNode<S = any, P = any> extends Node<S, P> {
   async _exec(items: any[]): Promise<any[]> {
     if (!items || !Array.isArray(items)) return [];
     const results = []; for (const item of items) results.push(await super._exec(item)); return results;
   }
 }
-class ParallelBatchNode<S = any, P = any> extends AsyncNode<S, P> {
+class ParallelBatchNode<S = any, P = any> extends Node<S, P> {
   async _exec(items: any[]): Promise<any[]> {
     if (!items || !Array.isArray(items)) return [];
     return Promise.all(items.map(item => super._exec(item)));
@@ -97,4 +97,4 @@ class ParallelBatchFlow<S = any, P = any> extends Flow<S, P> {
     return await this.post(shared, batchParams, undefined);
   }
 }
-export { BaseNode, AsyncNode, BatchNode, ParallelBatchNode, Flow, BatchFlow, ParallelBatchFlow };
+export { BaseNode, Node, BatchNode, ParallelBatchNode, Flow, BatchFlow, ParallelBatchFlow };
