@@ -212,8 +212,7 @@ describe('PocketFlow Tests with AsyncNode', () => {
 
     // Build the cycle with chaining
     n1.next(check);
-    check.next(subtract3, 'positive');
-    subtract3.next(check);
+    check.next(subtract3, 'positive').next(check);
     check.next(noOp, 'negative');
 
     const pipeline = new Flow(n1);
