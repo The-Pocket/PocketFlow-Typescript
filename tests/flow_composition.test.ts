@@ -1,5 +1,5 @@
 // tests/flow_composition.test.ts
-import { BaseNode, Flow } from '../src/index';
+import { AsyncNode, Flow } from '../src/index';
 
 // Define a shared storage type
 type SharedStorage = {
@@ -7,9 +7,9 @@ type SharedStorage = {
   [key: string]: any;
 };
 
-class NumberNode extends BaseNode<SharedStorage> {
-  constructor(private number: number) {
-    super();
+class NumberNode extends AsyncNode<SharedStorage> {
+  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
   }
 
   async prep(shared: SharedStorage): Promise<void> {
@@ -17,9 +17,9 @@ class NumberNode extends BaseNode<SharedStorage> {
   }
 }
 
-class AddNode extends BaseNode<SharedStorage> {
-  constructor(private number: number) {
-    super();
+class AddNode extends AsyncNode<SharedStorage> {
+  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
   }
 
   async prep(shared: SharedStorage): Promise<void> {
@@ -29,9 +29,9 @@ class AddNode extends BaseNode<SharedStorage> {
   }
 }
 
-class MultiplyNode extends BaseNode<SharedStorage> {
-  constructor(private number: number) {
-    super();
+class MultiplyNode extends AsyncNode<SharedStorage> {
+  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
   }
 
   async prep(shared: SharedStorage): Promise<void> {
@@ -41,7 +41,7 @@ class MultiplyNode extends BaseNode<SharedStorage> {
   }
 }
 
-describe('Flow Composition Tests', () => {
+describe('Flow Composition Tests with AsyncNode', () => {
   test('flow as node', async () => {
     /**
      * 1) Create a Flow (f1) starting with NumberNode(5), then AddNode(10), then MultiplyNode(2).
@@ -127,5 +127,79 @@ describe('Flow Composition Tests', () => {
     await wrapperFlow.run(shared);
     
     expect(shared.current).toBe(40);
+  });
+  
+  test('flow with retry handling', async () => {
+    /**
+     * Demonstrates retry capabilities in flow composition:
+     * Using nodes with retry logic in a flow structure
+     */
+    const shared: SharedStorage = {};
+    
+    // Create a faulty NumberNode that will fail once before succeeding
+    class FaultyNumberNode extends AsyncNode<SharedStorage> {
+      private attempts = 0;
+      
+      constructor(private number: number, maxRetries: number = 2, wait: number = 0.01) {
+        super(maxRetries, wait);
+      }
+      
+      async prep(shared: SharedStorage): Promise<number> {
+        return this.number;
+      }
+      
+      async exec(number: number): Promise<number> {
+        this.attempts++;
+        if (this.attempts === 1) {
+          throw new Error("Simulated failure on first attempt");
+        }
+        return number;
+      }
+      
+      async post(shared: SharedStorage, prepRes: any, execRes: any): Promise<string> {
+        shared.current = execRes;
+        return "default";
+      }
+    }
+    
+    // Create a flow with the faulty node followed by standard nodes
+    const faultyNumberNode = new FaultyNumberNode(5);
+    const addNode = new AddNode(10);
+    const multiplyNode = new MultiplyNode(2);
+    
+    faultyNumberNode.next(addNode);
+    addNode.next(multiplyNode);
+    
+    const flow = new Flow(faultyNumberNode);
+    await flow.run(shared);
+    
+    // Despite the initial failure, the retry mechanism should allow
+    // the flow to complete successfully: (5 + 10) * 2 = 30
+    expect(shared.current).toBe(30);
+  });
+  
+  test('nested flows with mixed retry configurations', async () => {
+    /**
+     * Demonstrates nesting flows with different retry configurations
+     */
+    const shared: SharedStorage = {};
+    
+    // Inner flow with a node that has high retry count
+    const numberNode = new NumberNode(5, 5, 0.01); // 5 retries
+    const addNode = new AddNode(3, 2, 0.01);      // 2 retries
+    numberNode.next(addNode);
+    const innerFlow = new Flow(numberNode);
+    
+    // Middle flow with a node that has medium retry count
+    const multiplyNode = new MultiplyNode(4, 3, 0.01); // 3 retries
+    innerFlow.next(multiplyNode);
+    const middleFlow = new Flow(innerFlow);
+    
+    // Wrapper flow
+    const wrapperFlow = new Flow(middleFlow);
+    await wrapperFlow.run(shared);
+    
+    // The result should be the same: (5 + 3) * 4 = 32
+    expect(shared.current).toBe(32);
   });
 });
