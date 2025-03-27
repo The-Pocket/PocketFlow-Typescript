@@ -1,15 +1,16 @@
-// tests/index.test.ts
-import { BaseNode, Flow } from '../src/index';
+// tests/flow_basic.test.ts
+import { AsyncNode, Flow } from '../src/index';
 
 // Define a shared storage type
 type SharedStorage = {
   current?: number;
+  execResult?: any;
   [key: string]: any;
 };
 
-class NumberNode extends BaseNode<SharedStorage> {
-  constructor(private number: number) {
-    super();
+class NumberNode extends AsyncNode<SharedStorage> {
+  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
   }
 
   async prep(shared: SharedStorage): Promise<void> {
@@ -17,9 +18,9 @@ class NumberNode extends BaseNode<SharedStorage> {
   }
 }
 
-class AddNode extends BaseNode<SharedStorage> {
-  constructor(private number: number) {
-    super();
+class AddNode extends AsyncNode<SharedStorage> {
+  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
   }
 
   async prep(shared: SharedStorage): Promise<void> {
@@ -29,9 +30,9 @@ class AddNode extends BaseNode<SharedStorage> {
   }
 }
 
-class MultiplyNode extends BaseNode<SharedStorage> {
-  constructor(private number: number) {
-    super();
+class MultiplyNode extends AsyncNode<SharedStorage> {
+  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
   }
 
   async prep(shared: SharedStorage): Promise<void> {
@@ -41,7 +42,11 @@ class MultiplyNode extends BaseNode<SharedStorage> {
   }
 }
 
-class CheckPositiveNode extends BaseNode<SharedStorage> {
+class CheckPositiveNode extends AsyncNode<SharedStorage> {
+  constructor(maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
+  }
+
   async post(shared: SharedStorage): Promise<string> {
     if (shared.current !== undefined && shared.current >= 0) {
       return 'positive';
@@ -51,13 +56,71 @@ class CheckPositiveNode extends BaseNode<SharedStorage> {
   }
 }
 
-class NoOpNode extends BaseNode<SharedStorage> {
+class NoOpNode extends AsyncNode<SharedStorage> {
+  constructor(maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
+  }
+
   async prep(): Promise<void> {
     // Do nothing, just pass
   }
 }
 
-describe('PocketFlow Tests', () => {
+// New class to demonstrate AsyncNode's retry capabilities
+class FlakyNode extends AsyncNode<SharedStorage> {
+  private attemptCount = 0;
+
+  constructor(private failUntilAttempt: number, maxRetries: number = 3, wait: number = 0.1) {
+    super(maxRetries, wait);
+  }
+
+  async exec(): Promise<any> {
+    this.attemptCount++;
+    
+    if (this.attemptCount < this.failUntilAttempt) {
+      throw new Error(`Attempt ${this.attemptCount} failed`);
+    }
+    
+    return `Success on attempt ${this.attemptCount}`;
+  }
+
+  async post(shared: SharedStorage, prepRes: any, execRes: any): Promise<string> {
+    shared.execResult = execRes;
+    return "default";
+  }
+}
+
+// New class to demonstrate using exec method more explicitly
+class ExecNode extends AsyncNode<SharedStorage> {
+  constructor(private operation: string, maxRetries: number = 1, wait: number = 0) {
+    super(maxRetries, wait);
+  }
+
+  async prep(shared: SharedStorage): Promise<number> {
+    // Return the current value for processing in exec
+    return shared.current || 0;
+  }
+
+  async exec(currentValue: number): Promise<number> {
+    switch(this.operation) {
+      case 'square':
+        return currentValue * currentValue;
+      case 'double':
+        return currentValue * 2;
+      case 'negate':
+        return -currentValue;
+      default:
+        return currentValue;
+    }
+  }
+
+  async post(shared: SharedStorage, prepRes: any, execRes: any): Promise<string> {
+    shared.current = execRes;
+    return "default";
+  }
+}
+
+describe('PocketFlow Tests with AsyncNode', () => {
   test('single number', async () => {
     const shared: SharedStorage = {};
     const start = new NumberNode(5);
@@ -149,13 +212,63 @@ describe('PocketFlow Tests', () => {
 
     // Build the cycle with chaining
     n1.next(check);
-    check.next(subtract3, 'positive').next(noOp, 'negative');
+    check.next(subtract3, 'positive');
     subtract3.next(check);
+    check.next(noOp, 'negative');
 
     const pipeline = new Flow(n1);
     await pipeline.run(shared);
 
     // final result should be -2: (10 -> 7 -> 4 -> 1 -> -2)
     expect(shared.current).toBe(-2);
+  });
+
+  // New tests demonstrating AsyncNode features
+
+  test('retry functionality', async () => {
+    const shared: SharedStorage = {};
+    
+    // This node will fail on the first attempt but succeed on the second
+    const flakyNode = new FlakyNode(2, 3, 0.01);
+    
+    const pipeline = new Flow(flakyNode);
+    await pipeline.run(shared);
+    
+    // Check that we got a success message indicating it was the second attempt
+    expect(shared.execResult).toBe('Success on attempt 2');
+  });
+
+  test('retry with fallback', async () => {
+    const shared: SharedStorage = {};
+    
+    // This node will always fail (requires 5 attempts, but we only allow 2)
+    const flakyNode = new FlakyNode(5, 2, 0.01);
+    
+    // Override the execFallback method to handle the failure
+    flakyNode.execFallback = async (prepRes: any, error: Error): Promise<any> => {
+      return "Fallback executed due to failure";
+    };
+    
+    const pipeline = new Flow(flakyNode);
+    await pipeline.run(shared);
+    
+    // Check that we got the fallback result
+    expect(shared.execResult).toBe('Fallback executed due to failure');
+  });
+
+  test('exec method processing', async () => {
+    const shared: SharedStorage = { current: 5 };
+    
+    const squareNode = new ExecNode('square');
+    const doubleNode = new ExecNode('double');
+    const negateNode = new ExecNode('negate');
+    
+    squareNode.next(doubleNode).next(negateNode);
+    
+    const pipeline = new Flow(squareNode);
+    await pipeline.run(shared);
+    
+    // 5 → square → 25 → double → 50 → negate → -50
+    expect(shared.current).toBe(-50);
   });
 });
