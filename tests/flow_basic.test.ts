@@ -1,5 +1,5 @@
 // tests/flow_basic.test.ts
-import { AsyncNode, Flow } from '../src/index';
+import { Node, Flow } from '../src/index';
 
 // Define a shared storage type
 type SharedStorage = {
@@ -8,7 +8,7 @@ type SharedStorage = {
   [key: string]: any;
 };
 
-class NumberNode extends AsyncNode<SharedStorage> {
+class NumberNode extends Node<SharedStorage> {
   constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -18,7 +18,7 @@ class NumberNode extends AsyncNode<SharedStorage> {
   }
 }
 
-class AddNode extends AsyncNode<SharedStorage> {
+class AddNode extends Node<SharedStorage> {
   constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -30,7 +30,7 @@ class AddNode extends AsyncNode<SharedStorage> {
   }
 }
 
-class MultiplyNode extends AsyncNode<SharedStorage> {
+class MultiplyNode extends Node<SharedStorage> {
   constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -42,7 +42,7 @@ class MultiplyNode extends AsyncNode<SharedStorage> {
   }
 }
 
-class CheckPositiveNode extends AsyncNode<SharedStorage> {
+class CheckPositiveNode extends Node<SharedStorage> {
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -56,7 +56,7 @@ class CheckPositiveNode extends AsyncNode<SharedStorage> {
   }
 }
 
-class NoOpNode extends AsyncNode<SharedStorage> {
+class NoOpNode extends Node<SharedStorage> {
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -66,8 +66,8 @@ class NoOpNode extends AsyncNode<SharedStorage> {
   }
 }
 
-// New class to demonstrate AsyncNode's retry capabilities
-class FlakyNode extends AsyncNode<SharedStorage> {
+// New class to demonstrate Node's retry capabilities
+class FlakyNode extends Node<SharedStorage> {
   private attemptCount = 0;
 
   constructor(private failUntilAttempt: number, maxRetries: number = 3, wait: number = 0.1) {
@@ -91,7 +91,7 @@ class FlakyNode extends AsyncNode<SharedStorage> {
 }
 
 // New class to demonstrate using exec method more explicitly
-class ExecNode extends AsyncNode<SharedStorage> {
+class ExecNode extends Node<SharedStorage> {
   constructor(private operation: string, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -120,7 +120,7 @@ class ExecNode extends AsyncNode<SharedStorage> {
   }
 }
 
-describe('PocketFlow Tests with AsyncNode', () => {
+describe('PocketFlow Tests with Node', () => {
   test('single number', async () => {
     const shared: SharedStorage = {};
     const start = new NumberNode(5);
@@ -222,7 +222,7 @@ describe('PocketFlow Tests with AsyncNode', () => {
     expect(shared.current).toBe(-2);
   });
 
-  // New tests demonstrating AsyncNode features
+  // New tests demonstrating Node features
 
   test('retry functionality', async () => {
     const shared: SharedStorage = {};

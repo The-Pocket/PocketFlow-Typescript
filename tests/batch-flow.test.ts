@@ -1,5 +1,5 @@
 // tests/async-batch-flow.test.ts
-import { AsyncNode, BatchFlow } from '../src/index';
+import { Node, BatchFlow } from '../src/index';
 
 // Define shared storage type
 type SharedStorage = {
@@ -15,7 +15,7 @@ type BatchParams = {
   multiplier?: number;
 };
 
-class AsyncDataProcessNode extends AsyncNode<SharedStorage, BatchParams> {
+class AsyncDataProcessNode extends Node<SharedStorage, BatchParams> {
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -49,7 +49,7 @@ class AsyncDataProcessNode extends AsyncNode<SharedStorage, BatchParams> {
   }
 }
 
-class AsyncErrorNode extends AsyncNode<SharedStorage, BatchParams> {
+class AsyncErrorNode extends Node<SharedStorage, BatchParams> {
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -155,7 +155,7 @@ describe('BatchFlow Tests', () => {
   });
 
   test('nested async flow', async () => {
-    class AsyncInnerNode extends AsyncNode<SharedStorage, BatchParams> {
+    class AsyncInnerNode extends Node<SharedStorage, BatchParams> {
       async prep(shared: SharedStorage): Promise<any> {
         return undefined;
       }
@@ -180,7 +180,7 @@ describe('BatchFlow Tests', () => {
       }
     }
 
-    class AsyncOuterNode extends AsyncNode<SharedStorage, BatchParams> {
+    class AsyncOuterNode extends Node<SharedStorage, BatchParams> {
       async prep(shared: SharedStorage): Promise<any> {
         return undefined;
       }
@@ -234,7 +234,7 @@ describe('BatchFlow Tests', () => {
   });
 
   test('custom async parameters', async () => {
-    class CustomParamAsyncNode extends AsyncNode<SharedStorage, BatchParams> {
+    class CustomParamNode extends Node<SharedStorage, BatchParams> {
       async prep(shared: SharedStorage): Promise<any> {
         return undefined;
       }
@@ -278,7 +278,7 @@ describe('BatchFlow Tests', () => {
       }
     };
 
-    const flow = new CustomParamBatchFlow(new CustomParamAsyncNode());
+    const flow = new CustomParamBatchFlow(new CustomParamNode());
     await flow.run(shared);
 
     expect(shared.results).toEqual({

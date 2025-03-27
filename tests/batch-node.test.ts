@@ -1,6 +1,6 @@
 
 // tests/batch-node.test.ts
-import { AsyncNode, BatchNode, Flow } from '../src/index';
+import { Node, BatchNode, Flow } from '../src/index';
 
 // Define shared storage type
 type SharedStorage = {
@@ -44,7 +44,7 @@ class AsyncArrayChunkNode extends BatchNode<SharedStorage> {
   }
 }
 
-class AsyncSumReduceNode extends AsyncNode<SharedStorage> {
+class AsyncSumReduceNode extends Node<SharedStorage> {
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }

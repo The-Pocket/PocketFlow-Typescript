@@ -1,5 +1,5 @@
 // tests/fallback.test.ts
-import { AsyncNode, Flow } from '../src/index';
+import { Node, Flow } from '../src/index';
 
 // Define a shared storage type
 type SharedStorage = {
@@ -11,7 +11,7 @@ type SharedStorage = {
   [key: string]: any;
 };
 
-class FallbackNode extends AsyncNode<SharedStorage> {
+class FallbackNode extends Node<SharedStorage> {
   private should_fail: boolean;
   private attempt_count: number = 0;
   
@@ -48,7 +48,7 @@ class FallbackNode extends AsyncNode<SharedStorage> {
   }
 }
 
-class AsyncFallbackNode extends AsyncNode<SharedStorage> {
+class AsyncFallbackNode extends Node<SharedStorage> {
   private should_fail: boolean;
   private attempt_count: number = 0;
   
@@ -87,8 +87,8 @@ class AsyncFallbackNode extends AsyncNode<SharedStorage> {
   }
 }
 
-// Changed to extend AsyncNode instead of BaseNode
-class ResultNode extends AsyncNode<SharedStorage> {
+// Changed to extend Node instead of BaseNode
+class ResultNode extends Node<SharedStorage> {
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -107,8 +107,8 @@ class ResultNode extends AsyncNode<SharedStorage> {
   }
 }
 
-// Changed to extend AsyncNode instead of BaseNode
-class NoFallbackNode extends AsyncNode<SharedStorage> {
+// Changed to extend Node instead of BaseNode
+class NoFallbackNode extends Node<SharedStorage> {
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -131,7 +131,7 @@ class NoFallbackNode extends AsyncNode<SharedStorage> {
 }
 
 // New class to demonstrate retry with eventual success
-class EventualSuccessNode extends AsyncNode<SharedStorage> {
+class EventualSuccessNode extends Node<SharedStorage> {
   private succeed_after_attempts: number;
   private attempt_count: number = 0;
   
@@ -165,7 +165,7 @@ class EventualSuccessNode extends AsyncNode<SharedStorage> {
 }
 
 // New class to demonstrate customized error handling
-class CustomErrorHandlerNode extends AsyncNode<SharedStorage> {
+class CustomErrorHandlerNode extends Node<SharedStorage> {
   private error_type: string;
   
   constructor(error_type: string = "standard", maxRetries: number = 1, wait: number = 0) {
@@ -204,7 +204,7 @@ class CustomErrorHandlerNode extends AsyncNode<SharedStorage> {
   }
 }
 
-describe('Fallback Functionality Tests with AsyncNode', () => {
+describe('Fallback Functionality Tests with Node', () => {
   test('successful execution', async () => {
     // Test that execFallback is not called when execution succeeds
     const shared: SharedStorage = {};
@@ -244,7 +244,7 @@ describe('Fallback Functionality Tests with AsyncNode', () => {
   });
 
   test('no fallback implementation', async () => {
-    // Test that without overriding execFallback, AsyncNode will rethrow the error
+    // Test that without overriding execFallback, Node will rethrow the error
     const shared: SharedStorage = {};
     const node = new NoFallbackNode();
     

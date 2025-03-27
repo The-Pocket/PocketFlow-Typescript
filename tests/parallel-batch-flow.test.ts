@@ -1,5 +1,5 @@
 // tests/parallel-batch-flow.test.ts
-import { AsyncNode, ParallelBatchNode, Flow, ParallelBatchFlow } from '../src/index';
+import { Node, ParallelBatchNode, Flow, ParallelBatchFlow } from '../src/index';
 
 // Define shared storage type
 type SharedStorage = {
@@ -37,7 +37,7 @@ class AsyncParallelNumberProcessor extends ParallelBatchNode<SharedStorage> {
   }
 }
 
-class AsyncAggregatorNode extends AsyncNode<SharedStorage> {
+class AsyncAggregatorNode extends Node<SharedStorage> {
   constructor(maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }

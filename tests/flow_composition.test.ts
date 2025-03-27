@@ -1,5 +1,5 @@
 // tests/flow_composition.test.ts
-import { AsyncNode, Flow } from '../src/index';
+import { Node, Flow } from '../src/index';
 
 // Define a shared storage type
 type SharedStorage = {
@@ -7,7 +7,7 @@ type SharedStorage = {
   [key: string]: any;
 };
 
-class NumberNode extends AsyncNode<SharedStorage> {
+class NumberNode extends Node<SharedStorage> {
   constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -17,7 +17,7 @@ class NumberNode extends AsyncNode<SharedStorage> {
   }
 }
 
-class AddNode extends AsyncNode<SharedStorage> {
+class AddNode extends Node<SharedStorage> {
   constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -29,7 +29,7 @@ class AddNode extends AsyncNode<SharedStorage> {
   }
 }
 
-class MultiplyNode extends AsyncNode<SharedStorage> {
+class MultiplyNode extends Node<SharedStorage> {
   constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
   }
@@ -41,7 +41,7 @@ class MultiplyNode extends AsyncNode<SharedStorage> {
   }
 }
 
-describe('Flow Composition Tests with AsyncNode', () => {
+describe('Flow Composition Tests with Node', () => {
   test('flow as node', async () => {
     /**
      * 1) Create a Flow (f1) starting with NumberNode(5), then AddNode(10), then MultiplyNode(2).
@@ -137,7 +137,7 @@ describe('Flow Composition Tests with AsyncNode', () => {
     const shared: SharedStorage = {};
     
     // Create a faulty NumberNode that will fail once before succeeding
-    class FaultyNumberNode extends AsyncNode<SharedStorage> {
+    class FaultyNumberNode extends Node<SharedStorage> {
       private attempts = 0;
       
       constructor(private number: number, maxRetries: number = 2, wait: number = 0.01) {
