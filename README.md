@@ -16,11 +16,14 @@ Pocket Flow is a TypeScript port of the original [Python version](https://github
 
 - **[Agentic Coding](https://zacharyhuang.substack.com/p/agentic-coding-the-most-fun-way-to)**: Let AI Agents (e.g., Cursor AI) build Agents—10x productivity boost!
 
-- To install, `pnpm add pocketflow` or just copy the [source code](pocketflow/index.ts).
+- To install, `npm add pocketflow` or just copy the [source code](src/index.ts).
 
 - To learn more, check out the [documentation](https://the-pocket.github.io/PocketFlow/). For an in-depth design dive, read the [essay](https://github.com/The-Pocket/.github/blob/main/profile/pocketflow.md).
 
 - 🎉 We now have a [discord](https://discord.gg/hUHHE9Sa6T)!
 
 
-TODO
+
+To run test: 
+1. `npm install --save-dev jest ts-jest @types/jest typescript`
+2. `npm test`
