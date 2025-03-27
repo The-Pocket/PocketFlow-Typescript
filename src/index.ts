@@ -78,7 +78,7 @@ class AsyncNode<S = any, P = any> extends BaseNode<S, P> {
   }
 }
 
-class AsyncBatchNode<S = any, P = any> extends AsyncNode<S, P> {
+class BatchNode<S = any, P = any> extends AsyncNode<S, P> {
   async _exec(items: any[]): Promise<any[]> {
     if (!items || !Array.isArray(items)) return [];
     
@@ -90,7 +90,7 @@ class AsyncBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   }
 }
 
-class AsyncParallelBatchNode<S = any, P = any> extends AsyncNode<S, P> {
+class ParallelBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   async _exec(items: any[]): Promise<any[]> {
     if (!items || !Array.isArray(items)) return [];
     
@@ -177,8 +177,8 @@ class ParallelBatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
 export {
   BaseNode,
   AsyncNode,
-  AsyncBatchNode,
-  AsyncParallelBatchNode,
+  BatchNode,
+  ParallelBatchNode,
   Flow,
   BatchFlow,
   ParallelBatchFlow
