@@ -1,6 +1,4 @@
 type Action = string;
-
-// Base Node class with generic types - all methods are async by default
 class BaseNode<S = any, P = any> {
   params: P = {} as P;
   successors: Map<Action, BaseNode<any, any>> = new Map();
@@ -10,11 +8,6 @@ class BaseNode<S = any, P = any> {
     return this;
   }
 
-  /**
-   * Add a successor node with an optional action
-   * @param node The next node in the flow
-   * @param action Optional action name (defaults to "default")
-   */
   next(node: BaseNode<any, any>, action: Action = "default"): BaseNode<any, any> {
     if (this.successors.has(action)) {
       console.warn(`Overwriting successor for action '${action}'`);
@@ -53,7 +46,6 @@ class BaseNode<S = any, P = any> {
   }
 }
 
-// AsyncNode with retry capability (renamed from Node to avoid conflicts)
 class AsyncNode<S = any, P = any> extends BaseNode<S, P> {
   maxRetries: number;
   wait: number;
@@ -78,16 +70,14 @@ class AsyncNode<S = any, P = any> extends BaseNode<S, P> {
           return await this.execFallback(prepRes, e as Error);
         }
         if (this.wait > 0) {
-          // Proper asynchronous sleep
           await new Promise(resolve => setTimeout(resolve, this.wait * 1000));
         }
       }
     }
-    return undefined; // Should never reach here, but needed for TypeScript
+    return undefined;
   }
 }
 
-// AsyncBatchNode for handling iterable inputs sequentially
 class AsyncBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   async _exec(items: any[]): Promise<any[]> {
     if (!items || !Array.isArray(items)) return [];
@@ -100,7 +90,6 @@ class AsyncBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   }
 }
 
-// AsyncParallelBatchNode for handling iterable inputs in parallel
 class AsyncParallelBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   async _exec(items: any[]): Promise<any[]> {
     if (!items || !Array.isArray(items)) return [];
@@ -109,7 +98,6 @@ class AsyncParallelBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   }
 }
 
-// Flow for orchestrating nodes
 class Flow<S = any, P = any> extends BaseNode<S, P> {
   start: BaseNode<any, any>;
 
@@ -151,7 +139,6 @@ class Flow<S = any, P = any> extends BaseNode<S, P> {
     throw new Error("Flow can't exec.");
   }
 
-  // Helper method to clone nodes
   private cloneNode(node: BaseNode<any, any>): BaseNode<any, any> {
     const clonedNode = Object.create(Object.getPrototypeOf(node));
     Object.assign(clonedNode, node);
@@ -161,14 +148,11 @@ class Flow<S = any, P = any> extends BaseNode<S, P> {
   }
 }
 
-// BatchFlow for running flows with different parameters
 class BatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
   async _run(shared: S): Promise<Action | undefined> {
-    // In BatchFlow, prep() should return an array of parameter objects
     const batchParams = await this.prep(shared) as P[] || [];
     
     for (const bp of batchParams) {
-      // Merge flow params with batch params
       const mergedParams = { ...this.params, ...bp } as P;
       await this._orchestrate(shared, mergedParams);
     }
@@ -177,15 +161,11 @@ class BatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
   }
 }
 
-// ParallelBatchFlow for running flows with different parameters in parallel
 class ParallelBatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
   async _run(shared: S): Promise<Action | undefined> {
-    // In ParallelBatchFlow, prep() should return an array of parameter objects
     const batchParams = await this.prep(shared) as P[] || [];
     
-    // Run all orchestrations in parallel
     await Promise.all(batchParams.map(bp => {
-      // Merge flow params with batch params
       const mergedParams = { ...this.params, ...bp } as P;
       return this._orchestrate(shared, mergedParams);
     }));
@@ -194,7 +174,6 @@ class ParallelBatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
   }
 }
 
-// Export classes
 export {
   BaseNode,
   AsyncNode,
