@@ -1,5 +1,5 @@
 
-// tests/async-batch-node.test.ts
+// tests/batch-node.test.ts
 import { AsyncNode, BatchNode, Flow } from '../src/index';
 
 // Define shared storage type
