@@ -77,7 +77,7 @@ class Flow<S = any, P = any> extends BaseNode<S, P> {
     return clonedNode;
   }
 }
-class BatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
+class BatchFlow<S = any, P = any> extends Flow<S, P> {
   async _run(shared: S): Promise<Action | undefined> {
     const batchParams = await this.prep(shared) as P[] || [];
     for (const bp of batchParams) {
@@ -87,7 +87,7 @@ class BatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
     return await this.post(shared, batchParams, undefined);
   }
 }
-class ParallelBatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
+class ParallelBatchFlow<S = any, P = any> extends Flow<S, P> {
   async _run(shared: S): Promise<Action | undefined> {
     const batchParams = await this.prep(shared) as P[] || [];
     await Promise.all(batchParams.map(bp => {
