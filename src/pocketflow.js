@@ -62,8 +62,8 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AsyncParallelBatchFlow = exports.AsyncBatchFlow = exports.AsyncFlow = exports.AsyncParallelBatchNode = exports.AsyncBatchNode = exports.AsyncNode = exports.BatchFlow = exports.Flow = exports.BatchNode = exports.RegularNode = exports.BaseNode = void 0;
-// Base Node class with generic types
+exports.ParallelBatchFlow = exports.BatchFlow = exports.Flow = exports.ParallelBatchNode = exports.BatchNode = exports.Node = exports.BaseNode = void 0;
+// Base Node class with generic types - all methods are async by default
 var BaseNode = /** @class */ (function () {
     function BaseNode() {
         this.params = {};
@@ -71,66 +71,90 @@ var BaseNode = /** @class */ (function () {
     }
     BaseNode.prototype.setParams = function (params) {
         this.params = params;
+        return this;
     };
-    BaseNode.prototype.addSuccessor = function (node, action) {
+    /**
+     * Add a successor node with an optional action
+     * @param node The next node in the flow
+     * @param action Optional action name (defaults to "default")
+     */
+    BaseNode.prototype.next = function (node, action) {
         if (action === void 0) { action = "default"; }
         if (this.successors.has(action)) {
             console.warn("Overwriting successor for action '".concat(action, "'"));
         }
         this.successors.set(action, node);
-        return node;
+        return node; // Return the next node to allow chaining
     };
     BaseNode.prototype.prep = function (shared) {
-        return undefined;
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                return [2 /*return*/, undefined];
+            });
+        });
     };
     BaseNode.prototype.exec = function (prepRes) {
-        return undefined;
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                return [2 /*return*/, undefined];
+            });
+        });
     };
     BaseNode.prototype.post = function (shared, prepRes, execRes) {
-        return undefined;
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                return [2 /*return*/, undefined];
+            });
+        });
     };
     BaseNode.prototype._exec = function (prepRes) {
-        return this.exec(prepRes);
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.exec(prepRes)];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
     };
     BaseNode.prototype._run = function (shared) {
-        var p = this.prep(shared);
-        var e = this._exec(p);
-        return this.post(shared, p, e);
+        return __awaiter(this, void 0, void 0, function () {
+            var p, e;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.prep(shared)];
+                    case 1:
+                        p = _a.sent();
+                        return [4 /*yield*/, this._exec(p)];
+                    case 2:
+                        e = _a.sent();
+                        return [4 /*yield*/, this.post(shared, p, e)];
+                    case 3: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
     };
     BaseNode.prototype.run = function (shared) {
-        if (this.successors.size > 0) {
-            console.warn("Node won't run successors. Use Flow.");
-        }
-        return this._run(shared);
-    };
-    // Operator overloading equivalent
-    BaseNode.prototype.then = function (node) {
-        return this.addSuccessor(node);
-    };
-    BaseNode.prototype.action = function (actionName) {
-        if (typeof actionName === 'string') {
-            return new ConditionalTransition(this, actionName);
-        }
-        throw new TypeError("Action must be a string");
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (this.successors.size > 0) {
+                            console.warn("Node won't run successors. Use Flow.");
+                        }
+                        return [4 /*yield*/, this._run(shared)];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
     };
     return BaseNode;
 }());
 exports.BaseNode = BaseNode;
-// Helper class for conditional transitions
-var ConditionalTransition = /** @class */ (function () {
-    function ConditionalTransition(src, action) {
-        this.src = src;
-        this.action = action;
-    }
-    ConditionalTransition.prototype.then = function (target) {
-        return this.src.addSuccessor(target, this.action);
-    };
-    return ConditionalTransition;
-}());
-// RegularNode with retry capability (renamed from Node)
-var RegularNode = /** @class */ (function (_super) {
-    __extends(RegularNode, _super);
-    function RegularNode(maxRetries, wait) {
+// Node with retry capability
+var Node = /** @class */ (function (_super) {
+    __extends(Node, _super);
+    function Node(maxRetries, wait) {
         if (maxRetries === void 0) { maxRetries = 1; }
         if (wait === void 0) { wait = 0; }
         var _this = _super.call(this) || this;
@@ -139,32 +163,54 @@ var RegularNode = /** @class */ (function (_super) {
         _this.wait = wait;
         return _this;
     }
-    RegularNode.prototype.execFallback = function (prepRes, error) {
-        throw error;
+    Node.prototype.execFallback = function (prepRes, error) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                throw error;
+            });
+        });
     };
-    RegularNode.prototype._exec = function (prepRes) {
-        for (this.currentRetry = 0; this.currentRetry < this.maxRetries; this.currentRetry++) {
-            try {
-                return this.exec(prepRes);
-            }
-            catch (e) {
-                if (this.currentRetry === this.maxRetries - 1) {
-                    return this.execFallback(prepRes, e);
+    Node.prototype._exec = function (prepRes) {
+        return __awaiter(this, void 0, void 0, function () {
+            var e_1;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        this.currentRetry = 0;
+                        _a.label = 1;
+                    case 1:
+                        if (!(this.currentRetry < this.maxRetries)) return [3 /*break*/, 10];
+                        _a.label = 2;
+                    case 2:
+                        _a.trys.push([2, 4, , 9]);
+                        return [4 /*yield*/, this.exec(prepRes)];
+                    case 3: return [2 /*return*/, _a.sent()];
+                    case 4:
+                        e_1 = _a.sent();
+                        if (!(this.currentRetry === this.maxRetries - 1)) return [3 /*break*/, 6];
+                        return [4 /*yield*/, this.execFallback(prepRes, e_1)];
+                    case 5: return [2 /*return*/, _a.sent()];
+                    case 6:
+                        if (!(this.wait > 0)) return [3 /*break*/, 8];
+                        // Proper asynchronous sleep
+                        return [4 /*yield*/, new Promise(function (resolve) { return setTimeout(resolve, _this.wait * 1000); })];
+                    case 7:
+                        // Proper asynchronous sleep
+                        _a.sent();
+                        _a.label = 8;
+                    case 8: return [3 /*break*/, 9];
+                    case 9:
+                        this.currentRetry++;
+                        return [3 /*break*/, 1];
+                    case 10: return [2 /*return*/, undefined]; // Should never reach here, but needed for TypeScript
                 }
-                if (this.wait > 0) {
-                    // In JavaScript, we can't block like in Python, but for simplicity
-                    // I'm using a sync sleep - in real code use async/await
-                    var now = Date.now();
-                    while (Date.now() - now < this.wait * 1000) {
-                        // busy wait
-                    }
-                }
-            }
-        }
+            });
+        });
     };
-    return RegularNode;
+    return Node;
 }(BaseNode));
-exports.RegularNode = RegularNode;
+exports.Node = Node;
 // BatchNode for handling iterable inputs
 var BatchNode = /** @class */ (function (_super) {
     __extends(BatchNode, _super);
@@ -172,12 +218,54 @@ var BatchNode = /** @class */ (function (_super) {
         return _super !== null && _super.apply(this, arguments) || this;
     }
     BatchNode.prototype._exec = function (items) {
-        var _this = this;
-        return (items || []).map(function (item) { return _super.prototype._exec.call(_this, item); });
+        return __awaiter(this, void 0, void 0, function () {
+            var results, _i, items_1, item, _a, _b;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
+                    case 0:
+                        if (!items || !Array.isArray(items))
+                            return [2 /*return*/, []];
+                        results = [];
+                        _i = 0, items_1 = items;
+                        _c.label = 1;
+                    case 1:
+                        if (!(_i < items_1.length)) return [3 /*break*/, 4];
+                        item = items_1[_i];
+                        _b = (_a = results).push;
+                        return [4 /*yield*/, _super.prototype._exec.call(this, item)];
+                    case 2:
+                        _b.apply(_a, [_c.sent()]);
+                        _c.label = 3;
+                    case 3:
+                        _i++;
+                        return [3 /*break*/, 1];
+                    case 4: return [2 /*return*/, results];
+                }
+            });
+        });
     };
     return BatchNode;
-}(RegularNode));
+}(Node));
 exports.BatchNode = BatchNode;
+// ParallelBatchNode for handling iterable inputs in parallel
+var ParallelBatchNode = /** @class */ (function (_super) {
+    __extends(ParallelBatchNode, _super);
+    function ParallelBatchNode() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    ParallelBatchNode.prototype._exec = function (items) {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                if (!items || !Array.isArray(items))
+                    return [2 /*return*/, []];
+                return [2 /*return*/, Promise.all(items.map(function (item) { return _super.prototype._exec.call(_this, item); }))];
+            });
+        });
+    };
+    return ParallelBatchNode;
+}(Node));
+exports.ParallelBatchNode = ParallelBatchNode;
 // Flow for orchestrating nodes
 var Flow = /** @class */ (function (_super) {
     __extends(Flow, _super);
@@ -195,30 +283,56 @@ var Flow = /** @class */ (function (_super) {
         return next;
     };
     Flow.prototype._orchestrate = function (shared, params) {
-        var current = this.cloneNode(this.start);
-        var p = params || this.params;
-        while (current) {
-            current.setParams(p);
-            var action = current._run(shared);
-            current = this.getNextNode(current, action);
-            if (current) {
-                current = this.cloneNode(current);
-            }
-        }
+        return __awaiter(this, void 0, void 0, function () {
+            var current, p, action;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        current = this.cloneNode(this.start);
+                        p = params || this.params;
+                        _a.label = 1;
+                    case 1:
+                        if (!current) return [3 /*break*/, 3];
+                        current.setParams(p);
+                        return [4 /*yield*/, current._run(shared)];
+                    case 2:
+                        action = _a.sent();
+                        current = this.getNextNode(current, action);
+                        if (current) {
+                            current = this.cloneNode(current);
+                        }
+                        return [3 /*break*/, 1];
+                    case 3: return [2 /*return*/];
+                }
+            });
+        });
     };
     Flow.prototype._run = function (shared) {
-        var pr = this.prep(shared);
-        this._orchestrate(shared);
-        return this.post(shared, pr, undefined);
+        return __awaiter(this, void 0, void 0, function () {
+            var pr;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.prep(shared)];
+                    case 1:
+                        pr = _a.sent();
+                        return [4 /*yield*/, this._orchestrate(shared)];
+                    case 2:
+                        _a.sent();
+                        return [4 /*yield*/, this.post(shared, pr, undefined)];
+                    case 3: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
     };
     Flow.prototype.exec = function (prepRes) {
-        throw new Error("Flow can't exec.");
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                throw new Error("Flow can't exec.");
+            });
+        });
     };
     // Helper method to clone nodes
     Flow.prototype.cloneNode = function (node) {
-        // In TypeScript, we can't easily deep clone objects with methods
-        // This is a simplified approach - in a real implementation, you would need
-        // a more sophisticated cloning strategy
         var clonedNode = Object.create(Object.getPrototypeOf(node));
         Object.assign(clonedNode, node);
         clonedNode.params = __assign({}, node.params);
@@ -235,334 +349,65 @@ var BatchFlow = /** @class */ (function (_super) {
         return _super !== null && _super.apply(this, arguments) || this;
     }
     BatchFlow.prototype._run = function (shared) {
-        // In BatchFlow, prep() should return an array of parameter objects
-        var batchParams = this.prep(shared) || [];
-        for (var _i = 0, batchParams_1 = batchParams; _i < batchParams_1.length; _i++) {
-            var bp = batchParams_1[_i];
-            // Merge flow params with batch params, matching Python's {**self.params, **bp}
-            var mergedParams = __assign(__assign({}, this.params), bp);
-            this._orchestrate(shared, mergedParams);
-        }
-        return this.post(shared, batchParams, undefined);
-    };
-    return BatchFlow;
-}(Flow));
-exports.BatchFlow = BatchFlow;
-// AsyncNode for asynchronous operations
-var AsyncNode = /** @class */ (function (_super) {
-    __extends(AsyncNode, _super);
-    function AsyncNode() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    AsyncNode.prototype.prep = function (shared) {
-        throw new Error("Use prepAsync.");
-    };
-    AsyncNode.prototype.exec = function (prepRes) {
-        throw new Error("Use execAsync.");
-    };
-    AsyncNode.prototype.post = function (shared, prepRes, execRes) {
-        throw new Error("Use postAsync.");
-    };
-    AsyncNode.prototype.execFallback = function (prepRes, error) {
-        throw new Error("Use execFallbackAsync.");
-    };
-    AsyncNode.prototype._run = function (shared) {
-        throw new Error("Use runAsync.");
-    };
-    AsyncNode.prototype.prepAsync = function (shared) {
         return __awaiter(this, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                return [2 /*return*/, undefined];
-            });
-        });
-    };
-    AsyncNode.prototype.execAsync = function (prepRes) {
-        return __awaiter(this, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                return [2 /*return*/, undefined];
-            });
-        });
-    };
-    AsyncNode.prototype.execFallbackAsync = function (prepRes, error) {
-        return __awaiter(this, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                throw error;
-            });
-        });
-    };
-    AsyncNode.prototype.postAsync = function (shared, prepRes, execRes) {
-        return __awaiter(this, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                return [2 /*return*/, undefined];
-            });
-        });
-    };
-    AsyncNode.prototype._execAsync = function (prepRes) {
-        return __awaiter(this, void 0, void 0, function () {
-            var i, e_1;
-            var _this = this;
+            var batchParams, _i, batchParams_1, bp, mergedParams;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0:
-                        i = 0;
-                        _a.label = 1;
-                    case 1:
-                        if (!(i < this.maxRetries)) return [3 /*break*/, 10];
-                        _a.label = 2;
-                    case 2:
-                        _a.trys.push([2, 4, , 9]);
-                        return [4 /*yield*/, this.execAsync(prepRes)];
-                    case 3: return [2 /*return*/, _a.sent()];
-                    case 4:
-                        e_1 = _a.sent();
-                        if (!(i === this.maxRetries - 1)) return [3 /*break*/, 6];
-                        return [4 /*yield*/, this.execFallbackAsync(prepRes, e_1)];
-                    case 5: return [2 /*return*/, _a.sent()];
-                    case 6:
-                        if (!(this.wait > 0)) return [3 /*break*/, 8];
-                        return [4 /*yield*/, new Promise(function (resolve) { return setTimeout(resolve, _this.wait * 1000); })];
-                    case 7:
-                        _a.sent();
-                        _a.label = 8;
-                    case 8: return [3 /*break*/, 9];
-                    case 9:
-                        i++;
-                        return [3 /*break*/, 1];
-                    case 10: return [2 /*return*/];
-                }
-            });
-        });
-    };
-    AsyncNode.prototype.runAsync = function (shared) {
-        return __awaiter(this, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        if (this.successors.size > 0) {
-                            console.warn("Node won't run successors. Use AsyncFlow.");
-                        }
-                        return [4 /*yield*/, this._runAsync(shared)];
-                    case 1: return [2 /*return*/, _a.sent()];
-                }
-            });
-        });
-    };
-    AsyncNode.prototype._runAsync = function (shared) {
-        return __awaiter(this, void 0, void 0, function () {
-            var p, e;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.prepAsync(shared)];
-                    case 1:
-                        p = _a.sent();
-                        return [4 /*yield*/, this._execAsync(p)];
-                    case 2:
-                        e = _a.sent();
-                        return [4 /*yield*/, this.postAsync(shared, p, e)];
-                    case 3: return [2 /*return*/, _a.sent()];
-                }
-            });
-        });
-    };
-    return AsyncNode;
-}(RegularNode));
-exports.AsyncNode = AsyncNode;
-// AsyncBatchNode for batch processing with async operations
-var AsyncBatchNode = /** @class */ (function (_super) {
-    __extends(AsyncBatchNode, _super);
-    function AsyncBatchNode() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    AsyncBatchNode.prototype._execAsync = function (items) {
-        return __awaiter(this, void 0, void 0, function () {
-            var results, _i, _a, item, _b, _c;
-            return __generator(this, function (_d) {
-                switch (_d.label) {
-                    case 0:
-                        results = [];
-                        _i = 0, _a = items || [];
-                        _d.label = 1;
-                    case 1:
-                        if (!(_i < _a.length)) return [3 /*break*/, 4];
-                        item = _a[_i];
-                        _c = (_b = results).push;
-                        return [4 /*yield*/, _super.prototype._execAsync.call(this, item)];
-                    case 2:
-                        _c.apply(_b, [_d.sent()]);
-                        _d.label = 3;
-                    case 3:
-                        _i++;
-                        return [3 /*break*/, 1];
-                    case 4: return [2 /*return*/, results];
-                }
-            });
-        });
-    };
-    return AsyncBatchNode;
-}(AsyncNode));
-exports.AsyncBatchNode = AsyncBatchNode;
-// AsyncParallelBatchNode for parallel batch processing
-var AsyncParallelBatchNode = /** @class */ (function (_super) {
-    __extends(AsyncParallelBatchNode, _super);
-    function AsyncParallelBatchNode() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    AsyncParallelBatchNode.prototype._execAsync = function (items) {
-        return __awaiter(this, void 0, void 0, function () {
-            var _this = this;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, Promise.all((items || []).map(function (item) { return _super.prototype._execAsync.call(_this, item); }))];
-                    case 1: return [2 /*return*/, _a.sent()];
-                }
-            });
-        });
-    };
-    return AsyncParallelBatchNode;
-}(AsyncNode));
-exports.AsyncParallelBatchNode = AsyncParallelBatchNode;
-// AsyncFlow for orchestrating async nodes
-var AsyncFlow = /** @class */ (function (_super) {
-    __extends(AsyncFlow, _super);
-    function AsyncFlow(start) {
-        var _this = _super.call(this) || this;
-        _this.start = start;
-        return _this;
-    }
-    AsyncFlow.prototype.getNextNode = function (current, action) {
-        var nextAction = action || "default";
-        var next = current.successors.get(nextAction);
-        if (!next && current.successors.size > 0) {
-            console.warn("Flow ends: '".concat(nextAction, "' not found in [").concat(Array.from(current.successors.keys()), "]"));
-        }
-        return next;
-    };
-    AsyncFlow.prototype._orchestrateAsync = function (shared, params) {
-        return __awaiter(this, void 0, void 0, function () {
-            var current, p, action;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        current = this.cloneNode(this.start);
-                        p = params || this.params;
-                        _a.label = 1;
-                    case 1:
-                        if (!current) return [3 /*break*/, 5];
-                        current.setParams(p);
-                        action = void 0;
-                        if (!(current instanceof AsyncNode)) return [3 /*break*/, 3];
-                        return [4 /*yield*/, current._runAsync(shared)];
-                    case 2:
-                        action = _a.sent();
-                        return [3 /*break*/, 4];
-                    case 3:
-                        action = current._run(shared);
-                        _a.label = 4;
-                    case 4:
-                        current = this.getNextNode(current, action);
-                        if (current) {
-                            current = this.cloneNode(current);
-                        }
-                        return [3 /*break*/, 1];
-                    case 5: return [2 /*return*/];
-                }
-            });
-        });
-    };
-    AsyncFlow.prototype._runAsync = function (shared) {
-        return __awaiter(this, void 0, void 0, function () {
-            var p;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.prepAsync(shared)];
-                    case 1:
-                        p = _a.sent();
-                        return [4 /*yield*/, this._orchestrateAsync(shared)];
-                    case 2:
-                        _a.sent();
-                        return [4 /*yield*/, this.postAsync(shared, p, undefined)];
-                    case 3: return [2 /*return*/, _a.sent()];
-                }
-            });
-        });
-    };
-    // Helper method to clone nodes
-    AsyncFlow.prototype.cloneNode = function (node) {
-        var clonedNode = Object.create(Object.getPrototypeOf(node));
-        Object.assign(clonedNode, node);
-        clonedNode.params = __assign({}, node.params);
-        clonedNode.successors = new Map(node.successors);
-        return clonedNode;
-    };
-    return AsyncFlow;
-}(AsyncNode));
-exports.AsyncFlow = AsyncFlow;
-// AsyncBatchFlow for running async flows with different parameters
-var AsyncBatchFlow = /** @class */ (function (_super) {
-    __extends(AsyncBatchFlow, _super);
-    function AsyncBatchFlow() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    AsyncBatchFlow.prototype._runAsync = function (shared) {
-        return __awaiter(this, void 0, void 0, function () {
-            var batchParams, _i, batchParams_2, bp, mergedParams;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.prepAsync(shared)];
+                    case 0: return [4 /*yield*/, this.prep(shared)];
                     case 1:
                         batchParams = (_a.sent()) || [];
-                        _i = 0, batchParams_2 = batchParams;
+                        _i = 0, batchParams_1 = batchParams;
                         _a.label = 2;
                     case 2:
-                        if (!(_i < batchParams_2.length)) return [3 /*break*/, 5];
-                        bp = batchParams_2[_i];
+                        if (!(_i < batchParams_1.length)) return [3 /*break*/, 5];
+                        bp = batchParams_1[_i];
                         mergedParams = __assign(__assign({}, this.params), bp);
-                        return [4 /*yield*/, this._orchestrateAsync(shared, mergedParams)];
+                        return [4 /*yield*/, this._orchestrate(shared, mergedParams)];
                     case 3:
                         _a.sent();
                         _a.label = 4;
                     case 4:
                         _i++;
                         return [3 /*break*/, 2];
-                    case 5: return [4 /*yield*/, this.postAsync(shared, batchParams, undefined)];
+                    case 5: return [4 /*yield*/, this.post(shared, batchParams, undefined)];
                     case 6: return [2 /*return*/, _a.sent()];
                 }
             });
         });
     };
-    return AsyncBatchFlow;
-}(AsyncFlow));
-exports.AsyncBatchFlow = AsyncBatchFlow;
-// AsyncParallelBatchFlow for running async flows in parallel
-var AsyncParallelBatchFlow = /** @class */ (function (_super) {
-    __extends(AsyncParallelBatchFlow, _super);
-    function AsyncParallelBatchFlow() {
+    return BatchFlow;
+}(Flow));
+exports.BatchFlow = BatchFlow;
+// ParallelBatchFlow for running flows with different parameters in parallel
+var ParallelBatchFlow = /** @class */ (function (_super) {
+    __extends(ParallelBatchFlow, _super);
+    function ParallelBatchFlow() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
-    AsyncParallelBatchFlow.prototype._runAsync = function (shared) {
+    ParallelBatchFlow.prototype._run = function (shared) {
         return __awaiter(this, void 0, void 0, function () {
             var batchParams;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.prepAsync(shared)];
+                    case 0: return [4 /*yield*/, this.prep(shared)];
                     case 1:
                         batchParams = (_a.sent()) || [];
-                        // Run all batch parameters in parallel
+                        // Run all orchestrations in parallel
                         return [4 /*yield*/, Promise.all(batchParams.map(function (bp) {
                                 // Merge flow params with batch params
                                 var mergedParams = __assign(__assign({}, _this.params), bp);
-                                return _this._orchestrateAsync(shared, mergedParams);
+                                return _this._orchestrate(shared, mergedParams);
                             }))];
                     case 2:
-                        // Run all batch parameters in parallel
+                        // Run all orchestrations in parallel
                         _a.sent();
-                        return [4 /*yield*/, this.postAsync(shared, batchParams, undefined)];
+                        return [4 /*yield*/, this.post(shared, batchParams, undefined)];
                     case 3: return [2 /*return*/, _a.sent()];
                 }
             });
         });
     };
-    return AsyncParallelBatchFlow;
-}(AsyncFlow));
-exports.AsyncParallelBatchFlow = AsyncParallelBatchFlow;
+    return ParallelBatchFlow;
+}(Flow));
+exports.ParallelBatchFlow = ParallelBatchFlow;
