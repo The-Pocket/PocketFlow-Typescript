@@ -1,8 +1,8 @@
 // Type definitions
 type Action = string;
 
-// Base Node class with generic types
-class BaseNode<P = any, S = any> {
+// Base Node class with generic types - S (shared) first, P (params) second
+class BaseNode<S = any, P = any> {
   params: P = {} as P;
   successors: Map<Action, BaseNode<any, any>> = new Map();
 
@@ -70,7 +70,7 @@ class ConditionalTransition {
 }
 
 // Regular Node with retry capability
-class Node<P = any, S = any> extends BaseNode<P, S> {
+class Node<S = any, P = any> extends BaseNode<S, P> {
   maxRetries: number;
   wait: number;
   currentRetry: number = 0;
@@ -107,14 +107,14 @@ class Node<P = any, S = any> extends BaseNode<P, S> {
 }
 
 // BatchNode for handling iterable inputs
-class BatchNode<P = any, S = any> extends Node<P, S> {
+class BatchNode<S = any, P = any> extends Node<S, P> {
   _exec(items: any[]): any[] {
     return (items || []).map(item => super._exec(item));
   }
 }
 
 // Flow for orchestrating nodes
-class Flow<P = any, S = any> extends BaseNode<P, S> {
+class Flow<S = any, P = any> extends BaseNode<S, P> {
   start: BaseNode<any, any>;
 
   constructor(start: BaseNode<any, any>) {
@@ -133,7 +133,7 @@ class Flow<P = any, S = any> extends BaseNode<P, S> {
 
   _orchestrate(shared: S, params?: P): void {
     let current: BaseNode<any, any> | undefined = this.cloneNode(this.start);
-    const p: P = params || this.params;
+    const p = params || this.params;
 
     while (current) {
       current.setParams(p);
@@ -169,18 +169,24 @@ class Flow<P = any, S = any> extends BaseNode<P, S> {
 }
 
 // BatchFlow for running flows with different parameters
-class BatchFlow<P = any, S = any> extends Flow<P[], S> {
+// Using P for batch item type and defining params as P
+class BatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
   _run(shared: S): Action | undefined {
-    const pr = this.prep(shared) || [];
-    for (const bp of pr) {
-      this._orchestrate(shared, bp as P);
+    // In BatchFlow, prep() should return an array of parameter objects
+    const batchParams = this.prep(shared) as P[] || [];
+    
+    for (const bp of batchParams) {
+      // Merge flow params with batch params, matching Python's {**self.params, **bp}
+      const mergedParams = { ...this.params, ...bp } as P;
+      this._orchestrate(shared, mergedParams);
     }
-    return this.post(shared, pr, undefined);
+    
+    return this.post(shared, batchParams, undefined);
   }
 }
 
 // AsyncNode for asynchronous operations
-class AsyncNode<P = any, S = any> extends Node<P, S> {
+class AsyncNode<S = any, P = any> extends Node<S, P> {
   prep(shared: S): any {
     throw new Error("Use prepAsync.");
   }
@@ -247,7 +253,7 @@ class AsyncNode<P = any, S = any> extends Node<P, S> {
 }
 
 // AsyncBatchNode for batch processing with async operations
-class AsyncBatchNode<P = any, S = any> extends AsyncNode<P, S> {
+class AsyncBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   async _execAsync(items: any[]): Promise<any[]> {
     const results = [];
     for (const item of items || []) {
@@ -258,14 +264,14 @@ class AsyncBatchNode<P = any, S = any> extends AsyncNode<P, S> {
 }
 
 // AsyncParallelBatchNode for parallel batch processing
-class AsyncParallelBatchNode<P = any, S = any> extends AsyncNode<P, S> {
+class AsyncParallelBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   async _execAsync(items: any[]): Promise<any[]> {
     return await Promise.all((items || []).map(item => super._execAsync(item)));
   }
 }
 
 // AsyncFlow for orchestrating async nodes
-class AsyncFlow<P = any, S = any> extends AsyncNode<P, S> {
+class AsyncFlow<S = any, P = any> extends AsyncNode<S, P> {
   start: BaseNode<any, any>;
 
   constructor(start: BaseNode<any, any>) {
@@ -320,22 +326,33 @@ class AsyncFlow<P = any, S = any> extends AsyncNode<P, S> {
 }
 
 // AsyncBatchFlow for running async flows with different parameters
-class AsyncBatchFlow<P = any, S = any> extends AsyncFlow<P[], S> {
+class AsyncBatchFlow<S = any, P = Record<string, any>> extends AsyncFlow<S, P> {
   async _runAsync(shared: S): Promise<Action | undefined> {
-    const pr = await this.prepAsync(shared) || [];
-    for (const bp of pr) {
-      await this._orchestrateAsync(shared, bp as P);
+    const batchParams = await this.prepAsync(shared) as P[] || [];
+    
+    for (const bp of batchParams) {
+      // Merge flow params with batch params
+      const mergedParams = { ...this.params, ...bp } as P;
+      await this._orchestrateAsync(shared, mergedParams);
     }
-    return await this.postAsync(shared, pr, undefined);
+    
+    return await this.postAsync(shared, batchParams, undefined);
   }
 }
 
 // AsyncParallelBatchFlow for running async flows in parallel
-class AsyncParallelBatchFlow<P = any, S = any> extends AsyncFlow<P[], S> {
+class AsyncParallelBatchFlow<S = any, P = Record<string, any>> extends AsyncFlow<S, P> {
   async _runAsync(shared: S): Promise<Action | undefined> {
-    const pr = await this.prepAsync(shared) || [];
-    await Promise.all(pr.map(bp => this._orchestrateAsync(shared, bp as P)));
-    return await this.postAsync(shared, pr, undefined);
+    const batchParams = await this.prepAsync(shared) as P[] || [];
+    
+    // Run all batch parameters in parallel
+    await Promise.all(batchParams.map(bp => {
+      // Merge flow params with batch params
+      const mergedParams = { ...this.params, ...bp } as P;
+      return this._orchestrateAsync(shared, mergedParams);
+    }));
+    
+    return await this.postAsync(shared, batchParams, undefined);
   }
 }
 

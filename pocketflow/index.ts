@@ -1,355 +1,358 @@
-// Type definitions
-type Action = string;
+type Action = string
+type Params = Record<string, any>
+type Successors = Record<Action, BaseNode>
 
-// Base Node class with generic types
-class BaseNode<P = any, S = any> {
-  params: P = {} as P;
-  successors: Map<Action, BaseNode<any, any>> = new Map();
+const DEFAULT_ACTION = 'default'
 
-  setParams(params: P): void {
-    this.params = params;
+export class BaseNode {
+  params: Params = {}
+  successors: Successors = {}
+  curRetry = 0
+
+  setParams(params: Params): this {
+    this.params = params
+    return this
   }
 
-  addSuccessor(node: BaseNode<any, any>, action: Action = "default"): BaseNode<any, any> {
-    if (this.successors.has(action)) {
-      console.warn(`Overwriting successor for action '${action}'`);
+  next(node: BaseNode, action: Action = DEFAULT_ACTION): BaseNode {
+    if (action in this.successors) {
+      console.warn(`Overwriting successor for action '${action}'`)
     }
-    this.successors.set(action, node);
-    return node;
+    this.successors[action] = node
+    return node
   }
 
-  prep(shared: S): any {
-    return undefined;
-  }
-
-  exec(prepRes: any): any {
-    return undefined;
-  }
-
-  post(shared: S, prepRes: any, execRes: any): Action | undefined {
-    return undefined;
-  }
-
-  _exec(prepRes: any): any {
-    return this.exec(prepRes);
-  }
-
-  _run(shared: S): Action | undefined {
-    const p = this.prep(shared);
-    const e = this._exec(p);
-    return this.post(shared, p, e);
-  }
-
-  run(shared: S): Action | undefined {
-    if (this.successors.size > 0) {
-      console.warn("Node won't run successors. Use Flow.");
+  on(action: string): ConditionalTransition {
+    if (typeof action !== 'string') {
+      throw new TypeError('Action must be a string')
     }
-    return this._run(shared);
+
+    return new ConditionalTransition(this, action)
   }
 
-  // Operator overloading equivalent
-  then(node: BaseNode<any, any>): BaseNode<any, any> {
-    return this.addSuccessor(node);
+  prep(shared: any): any {}
+  exec(prepRes: any): any {}
+  post(shared: any, prepRes: any, execRes: any): Action | void {}
+
+  protected _exec(prepRes: any): any {
+    return this.exec(prepRes)
   }
 
-  action(actionName: Action): ConditionalTransition {
-    if (typeof actionName === 'string') {
-      return new ConditionalTransition(this, actionName);
+  _run(shared: any): any {
+    const p = this.prep(shared)
+    const e = this._exec(p)
+    return this.post(shared, p, e)
+  }
+
+  run(shared: any): any {
+    if (Object.keys(this.successors).length > 0) {
+      console.warn("Node won't run successors. Use Flow.")
     }
-    throw new TypeError("Action must be a string");
+    return this._run(shared)
   }
 }
 
-// Helper class for conditional transitions
 class ConditionalTransition {
-  constructor(private src: BaseNode<any, any>, private action: Action) {}
+  constructor(
+    private src: BaseNode,
+    private action: string,
+  ) {}
 
-  then(target: BaseNode<any, any>): BaseNode<any, any> {
-    return this.src.addSuccessor(target, this.action);
+  next(tgt: BaseNode): BaseNode {
+    return this.src.next(tgt, this.action)
   }
 }
 
-// Regular Node with retry capability
-class Node<P = any, S = any> extends BaseNode<P, S> {
-  maxRetries: number;
-  wait: number;
-  currentRetry: number = 0;
-
-  constructor(maxRetries: number = 1, wait: number = 0) {
-    super();
-    this.maxRetries = maxRetries;
-    this.wait = wait;
+export class Node extends BaseNode {
+  constructor(
+    public maxRetries = 1,
+    public wait = 0,
+  ) {
+    super()
   }
 
-  execFallback(prepRes: any, error: Error): any {
-    throw error;
+  execFallback(prepRes: any, exc: Error): any {
+    throw exc
   }
 
-  _exec(prepRes: any): any {
-    for (this.currentRetry = 0; this.currentRetry < this.maxRetries; this.currentRetry++) {
+  protected _exec(prepRes: any): any {
+    for (this.curRetry = 0; this.curRetry < this.maxRetries; this.curRetry++) {
       try {
-        return this.exec(prepRes);
+        return this.exec(prepRes)
       } catch (e) {
-        if (this.currentRetry === this.maxRetries - 1) {
-          return this.execFallback(prepRes, e as Error);
+        if (this.curRetry === this.maxRetries - 1) {
+          return this.execFallback(prepRes, e as Error)
         }
         if (this.wait > 0) {
-          // In JavaScript, we can't block like in Python, but for simplicity
-          // I'm using a sync sleep - in real code use async/await
-          const now = Date.now();
-          while (Date.now() - now < this.wait * 1000) {
-            // busy wait
+          // Sleep synchronously - in real TypeScript this would be handled differently
+          // but we're matching the Python behavior
+          const start = new Date().getTime()
+          while (new Date().getTime() - start < this.wait * 1000) {
+            // Empty block for synchronous wait
           }
         }
       }
     }
+    // This should never be reached, but TypeScript requires a return value
+    return null
   }
 }
 
-// BatchNode for handling iterable inputs
-class BatchNode<P = any, S = any> extends Node<P, S> {
-  _exec(items: any[]): any[] {
-    return (items || []).map(item => super._exec(item));
+export class BatchNode extends Node {
+  protected _exec(items: any[]): any[] {
+    return (items || []).map((i) => super._exec(i))
   }
 }
 
-// Flow for orchestrating nodes
-class Flow<P = any, S = any> extends BaseNode<P, S> {
-  start: BaseNode<any, any>;
-
-  constructor(start: BaseNode<any, any>) {
-    super();
-    this.start = start;
+export class Flow extends BaseNode {
+  constructor(public start: BaseNode) {
+    super()
   }
 
-  getNextNode(current: BaseNode<any, any>, action?: Action): BaseNode<any, any> | undefined {
-    const nextAction = action || "default";
-    const next = current.successors.get(nextAction);
-    if (!next && current.successors.size > 0) {
-      console.warn(`Flow ends: '${nextAction}' not found in [${Array.from(current.successors.keys())}]`);
+  getNextNode(curr: BaseNode, action?: Action): BaseNode | null {
+    const next = curr.successors[action || DEFAULT_ACTION]
+    if (!next && Object.keys(curr.successors).length > 0) {
+      console.warn(`Flow ends: '${action}' not found in ${Object.keys(curr.successors)}`)
     }
-    return next;
+    return next || null
   }
 
-  _orchestrate(shared: S, params?: P): void {
-    let current: BaseNode<any, any> | undefined = this.cloneNode(this.start);
-    const p: P = params || this.params;
+  protected _orch(shared: any, params?: Params): any {
+    let curr: BaseNode | null = this.start
+    let p = { ...this.params, ...(params || {}) }
+    let lastResult: any
 
-    while (current) {
-      current.setParams(p);
-      const action = current._run(shared);
-      current = this.getNextNode(current, action);
-      if (current) {
-        current = this.cloneNode(current);
+    while (curr) {
+      // Properly clone node while preserving methods
+      const node = Object.create(Object.getPrototypeOf(curr))
+      Object.assign(node, curr)
+      node.params = { ...curr.params }
+      node.successors = { ...curr.successors }
+
+      node.setParams(p)
+      lastResult = node._run(shared)
+      curr = this.getNextNode(curr, lastResult)
+    }
+
+    return lastResult
+  }
+
+  _run(shared: any): any {
+    const pr = this.prep(shared)
+    const result = this._orch(shared)
+    return this.post(shared, pr, result)
+  }
+
+  exec(prepRes: any): never {
+    throw new Error("Flow can't exec.")
+  }
+}
+
+export class BatchFlow extends Flow {
+  _run(shared: any): any {
+    const pr = this.prep(shared) || []
+    let result = null
+    for (const bp of pr) {
+      result = this._orch(shared, { ...this.params, ...bp })
+    }
+    return this.post(shared, pr, result)
+  }
+}
+
+// Async variants
+export class AsyncNode extends Node {
+  prep(shared: any): never {
+    throw new Error('Use prepAsync.')
+  }
+  exec(prepRes: any): never {
+    throw new Error('Use execAsync.')
+  }
+  post(shared: any, prepRes: any, execRes: any): never {
+    throw new Error('Use postAsync.')
+  }
+  execFallback(prepRes: any, exc: Error): never {
+    throw new Error('Use execFallbackAsync.')
+  }
+  _run(shared: any): never {
+    throw new Error('Use runAsync.')
+  }
+
+  async prepAsync(shared: any): Promise<any> {}
+  async execAsync(prepRes: any): Promise<any> {}
+  async execFallbackAsync(prepRes: any, exc: Error): Promise<any> {
+    throw exc
+  }
+  async postAsync(shared: any, prepRes: any, execRes: any): Promise<any> {}
+
+  protected async _exec(prepRes: any): Promise<any> {
+    for (this.curRetry = 0; this.curRetry < this.maxRetries; this.curRetry++) {
+      try {
+        return await this.execAsync(prepRes)
+      } catch (e) {
+        if (this.curRetry === this.maxRetries - 1) {
+          return await this.execFallbackAsync(prepRes, e as Error)
+        }
+        if (this.wait > 0) {
+          await new Promise((resolve) => setTimeout(resolve, this.wait * 1000))
+        }
       }
     }
+    // This should never be reached, but TypeScript requires a return value
+    return null
   }
 
-  _run(shared: S): Action | undefined {
-    const pr = this.prep(shared);
-    this._orchestrate(shared);
-    return this.post(shared, pr, undefined);
-  }
-
-  exec(prepRes: any): any {
-    throw new Error("Flow can't exec.");
-  }
-
-  // Helper method to clone nodes
-  private cloneNode(node: BaseNode<any, any>): BaseNode<any, any> {
-    // In TypeScript, we can't easily deep clone objects with methods
-    // This is a simplified approach - in a real implementation, you would need
-    // a more sophisticated cloning strategy
-    const clonedNode = Object.create(Object.getPrototypeOf(node));
-    Object.assign(clonedNode, node);
-    clonedNode.params = { ...node.params };
-    clonedNode.successors = new Map(node.successors);
-    return clonedNode;
-  }
-}
-
-// BatchFlow for running flows with different parameters
-class BatchFlow<P = any, S = any> extends Flow<P[], S> {
-  _run(shared: S): Action | undefined {
-    const pr = this.prep(shared) || [];
-    for (const bp of pr) {
-      this._orchestrate(shared, bp as P);
+  async runAsync(shared: any): Promise<any> {
+    if (Object.keys(this.successors).length > 0) {
+      console.warn("Node won't run successors. Use AsyncFlow.")
     }
-    return this.post(shared, pr, undefined);
+    return this._runAsync(shared)
+  }
+
+  async _runAsync(shared: any): Promise<any> {
+    const p = await this.prepAsync(shared)
+    const e = await this._exec(p)
+    return this.postAsync(shared, p, e)
   }
 }
 
-// AsyncNode for asynchronous operations
-class AsyncNode<P = any, S = any> extends Node<P, S> {
-  prep(shared: S): any {
-    throw new Error("Use prepAsync.");
+// In TypeScript, we can't directly inherit from multiple classes like in Python
+// So we implement the BatchNode functionality in AsyncBatchNode
+export class AsyncBatchNode extends AsyncNode {
+  async prepAsync(shared: any): Promise<any[]> {
+    return super.prepAsync(shared)
   }
 
-  exec(prepRes: any): any {
-    throw new Error("Use execAsync.");
+  async postAsync(shared: any, prepRes: any, execRes: any): Promise<any> {
+    return super.postAsync(shared, prepRes, execRes)
   }
 
-  post(shared: S, prepRes: any, execRes: any): Action | undefined {
-    throw new Error("Use postAsync.");
+  protected async _exec(items: any[]): Promise<any[]> {
+    // Process items sequentially like BatchNode but with async handling
+    if (!items || !items.length) return []
+
+    // Apply retry logic to each item individually
+    const results: any[] = []
+    for (const item of items) {
+      // Use super._exec to apply retry logic from AsyncNode
+      results.push(await super._exec(item))
+    }
+    return results
+  }
+}
+
+export class AsyncParallelBatchNode extends AsyncNode {
+  async prepAsync(shared: any): Promise<any[]> {
+    return super.prepAsync(shared)
   }
 
-  execFallback(prepRes: any, error: Error): any {
-    throw new Error("Use execFallbackAsync.");
+  async postAsync(shared: any, prepRes: any, execRes: any): Promise<any> {
+    return super.postAsync(shared, prepRes, execRes)
   }
 
-  _run(shared: S): Action | undefined {
-    throw new Error("Use runAsync.");
+  protected async _exec(items: any[]): Promise<any[]> {
+    // Process all items in parallel using Promise.all
+    // This is equivalent to asyncio.gather in Python
+    if (!items || !items.length) return []
+
+    // Map each item to a promise that applies retry logic
+    const promises = (items || []).map((i) => super._exec(i))
+
+    // Promise.all will reject if any promise rejects
+    return await Promise.all(promises)
+  }
+}
+
+export class AsyncFlow extends Flow {
+  prep(shared: any): never {
+    throw new Error('Use prepAsync.')
+  }
+  exec(prepRes: any): never {
+    throw new Error("Flow can't exec.")
+  }
+  post(shared: any, prepRes: any, execRes: any): never {
+    throw new Error('Use postAsync.')
+  }
+  _run(shared: any): never {
+    throw new Error('Use runAsync.')
   }
 
-  async prepAsync(shared: S): Promise<any> {
-    return undefined;
+  execFallback(prepRes: any, exc: Error): never {
+    throw new Error('Use execFallbackAsync.')
   }
 
   async execAsync(prepRes: any): Promise<any> {
-    return undefined;
+    throw new Error("AsyncFlow can't execAsync.")
   }
 
-  async execFallbackAsync(prepRes: any, error: Error): Promise<any> {
-    throw error;
+  async execFallbackAsync(prepRes: any, exc: Error): Promise<any> {
+    throw exc
   }
 
-  async postAsync(shared: S, prepRes: any, execRes: any): Promise<Action | undefined> {
-    return undefined;
-  }
-
-  async _execAsync(prepRes: any): Promise<any> {
-    for (let i = 0; i < this.maxRetries; i++) {
-      try {
-        return await this.execAsync(prepRes);
-      } catch (e) {
-        if (i === this.maxRetries - 1) {
-          return await this.execFallbackAsync(prepRes, e as Error);
-        }
-        if (this.wait > 0) {
-          await new Promise(resolve => setTimeout(resolve, this.wait * 1000));
-        }
-      }
+  async runAsync(shared: any): Promise<any> {
+    if (Object.keys(this.successors).length > 0) {
+      console.warn("AsyncFlow won't run successors.")
     }
+    return this._runAsync(shared)
   }
+  async prepAsync(shared: any): Promise<any> {}
+  async postAsync(shared: any, prepRes: any, execRes: any): Promise<any> {}
+  protected async _orchAsync(shared: any, params?: Params): Promise<any> {
+    let curr: BaseNode | null = this.start
+    let p = { ...this.params, ...(params || {}) }
+    let lastResult: any
 
-  async runAsync(shared: S): Promise<Action | undefined> {
-    if (this.successors.size > 0) {
-      console.warn("Node won't run successors. Use AsyncFlow.");
+    while (curr) {
+      // Properly clone node while preserving methods
+      const node = Object.create(Object.getPrototypeOf(curr))
+      Object.assign(node, curr)
+      node.params = { ...curr.params }
+      node.successors = { ...curr.successors }
+
+      node.setParams(p)
+      lastResult = node instanceof AsyncNode ? await node._runAsync(shared) : node._run(shared)
+      curr = this.getNextNode(curr, lastResult)
     }
-    return await this._runAsync(shared);
+
+    return lastResult
   }
 
-  async _runAsync(shared: S): Promise<Action | undefined> {
-    const p = await this.prepAsync(shared);
-    const e = await this._execAsync(p);
-    return await this.postAsync(shared, p, e);
+  protected async _runAsync(shared: any): Promise<any> {
+    const p = await this.prepAsync(shared)
+    await this._orchAsync(shared)
+    return await this.postAsync(shared, p, null)
   }
 }
 
-// AsyncBatchNode for batch processing with async operations
-class AsyncBatchNode<P = any, S = any> extends AsyncNode<P, S> {
-  async _execAsync(items: any[]): Promise<any[]> {
-    const results = [];
-    for (const item of items || []) {
-      results.push(await super._execAsync(item));
-    }
-    return results;
-  }
-}
-
-// AsyncParallelBatchNode for parallel batch processing
-class AsyncParallelBatchNode<P = any, S = any> extends AsyncNode<P, S> {
-  async _execAsync(items: any[]): Promise<any[]> {
-    return await Promise.all((items || []).map(item => super._execAsync(item)));
-  }
-}
-
-// AsyncFlow for orchestrating async nodes
-class AsyncFlow<P = any, S = any> extends AsyncNode<P, S> {
-  start: BaseNode<any, any>;
-
-  constructor(start: BaseNode<any, any>) {
-    super();
-    this.start = start;
-  }
-
-  getNextNode(current: BaseNode<any, any>, action?: Action): BaseNode<any, any> | undefined {
-    const nextAction = action || "default";
-    const next = current.successors.get(nextAction);
-    if (!next && current.successors.size > 0) {
-      console.warn(`Flow ends: '${nextAction}' not found in [${Array.from(current.successors.keys())}]`);
-    }
-    return next;
-  }
-
-  async _orchestrateAsync(shared: S, params?: P): Promise<void> {
-    let current: BaseNode<any, any> | undefined = this.cloneNode(this.start);
-    const p = params || this.params;
-
-    while (current) {
-      current.setParams(p);
-      let action;
-      
-      if (current instanceof AsyncNode) {
-        action = await current._runAsync(shared);
-      } else {
-        action = current._run(shared);
-      }
-      
-      current = this.getNextNode(current, action);
-      if (current) {
-        current = this.cloneNode(current);
-      }
-    }
-  }
-
-  async _runAsync(shared: S): Promise<Action | undefined> {
-    const p = await this.prepAsync(shared);
-    await this._orchestrateAsync(shared);
-    return await this.postAsync(shared, p, undefined);
-  }
-
-  // Helper method to clone nodes
-  private cloneNode(node: BaseNode<any, any>): BaseNode<any, any> {
-    const clonedNode = Object.create(Object.getPrototypeOf(node));
-    Object.assign(clonedNode, node);
-    clonedNode.params = { ...node.params };
-    clonedNode.successors = new Map(node.successors);
-    return clonedNode;
-  }
-}
-
-// AsyncBatchFlow for running async flows with different parameters
-class AsyncBatchFlow<P = any, S = any> extends AsyncFlow<P[], S> {
-  async _runAsync(shared: S): Promise<Action | undefined> {
-    const pr = await this.prepAsync(shared) || [];
+export class AsyncBatchFlow extends AsyncFlow {
+  async prepAsync(shared: any): Promise<any> {}
+  async postAsync(shared: any, prepRes: any, execRes: any): Promise<any> {}
+  protected async _runAsync(shared: any): Promise<any> {
+    const pr = (await this.prepAsync(shared)) || []
+    let result = null
     for (const bp of pr) {
-      await this._orchestrateAsync(shared, bp as P);
+      result = await this._orchAsync(shared, { ...this.params, ...bp })
     }
-    return await this.postAsync(shared, pr, undefined);
+    return await this.postAsync(shared, pr, result)
   }
 }
 
-// AsyncParallelBatchFlow for running async flows in parallel
-class AsyncParallelBatchFlow<P = any, S = any> extends AsyncFlow<P[], S> {
-  async _runAsync(shared: S): Promise<Action | undefined> {
-    const pr = await this.prepAsync(shared) || [];
-    await Promise.all(pr.map(bp => this._orchestrateAsync(shared, bp as P)));
-    return await this.postAsync(shared, pr, undefined);
+export class AsyncParallelBatchFlow extends AsyncFlow {
+  async prepAsync(shared: any): Promise<any[]> {
+    return []
+  }
+
+  async postAsync(shared: any, prepRes: any, execRes: any): Promise<any> {}
+
+  protected async _runAsync(shared: any): Promise<any> {
+    const pr = (await this.prepAsync(shared)) || []
+
+    // Process all batch items in parallel
+    const results = await Promise.all(
+      pr.map((bp: any) => this._orchAsync(shared, { ...this.params, ...bp })),
+    )
+
+    // Use the last result if available
+    const lastResult = results.length > 0 ? results[results.length - 1] : null
+    return await this.postAsync(shared, pr, lastResult)
   }
 }
-
-// Export all classes
-export {
-  BaseNode,
-  Node,
-  BatchNode,
-  Flow,
-  BatchFlow,
-  AsyncNode,
-  AsyncBatchNode,
-  AsyncParallelBatchNode,
-  AsyncFlow,
-  AsyncBatchFlow,
-  AsyncParallelBatchFlow
-};
