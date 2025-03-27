@@ -92,7 +92,7 @@ var LoadDocument = /** @class */ (function (_super) {
         });
     };
     return LoadDocument;
-}(pocketflow_1.Node));
+}(pocketflow_1.AsyncNode));
 var AnalyzeDocument = /** @class */ (function (_super) {
     __extends(AnalyzeDocument, _super);
     function AnalyzeDocument() {
@@ -133,7 +133,7 @@ var AnalyzeDocument = /** @class */ (function (_super) {
         });
     };
     return AnalyzeDocument;
-}(pocketflow_1.Node));
+}(pocketflow_1.AsyncNode));
 var SummarizeDocument = /** @class */ (function (_super) {
     __extends(SummarizeDocument, _super);
     function SummarizeDocument() {
@@ -170,7 +170,7 @@ var SummarizeDocument = /** @class */ (function (_super) {
         });
     };
     return SummarizeDocument;
-}(pocketflow_1.Node));
+}(pocketflow_1.AsyncNode));
 var BatchSearchTerms = /** @class */ (function (_super) {
     __extends(BatchSearchTerms, _super);
     function BatchSearchTerms() {
@@ -211,7 +211,7 @@ var BatchSearchTerms = /** @class */ (function (_super) {
         });
     };
     return BatchSearchTerms;
-}(pocketflow_1.ParallelBatchNode));
+}(pocketflow_1.AsyncParallelBatchNode));
 function main() {
     return __awaiter(this, void 0, void 0, function () {
         var loadDoc, analyzeDoc, summarizeDoc, searchTerms, flow, shared;

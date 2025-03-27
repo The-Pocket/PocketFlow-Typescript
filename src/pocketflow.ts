@@ -53,8 +53,8 @@ class BaseNode<S = any, P = any> {
   }
 }
 
-// Node with retry capability
-class Node<S = any, P = any> extends BaseNode<S, P> {
+// AsyncNode with retry capability (renamed from Node to avoid conflicts)
+class AsyncNode<S = any, P = any> extends BaseNode<S, P> {
   maxRetries: number;
   wait: number;
   currentRetry: number = 0;
@@ -87,8 +87,8 @@ class Node<S = any, P = any> extends BaseNode<S, P> {
   }
 }
 
-// BatchNode for handling iterable inputs
-class BatchNode<S = any, P = any> extends Node<S, P> {
+// AsyncBatchNode for handling iterable inputs sequentially
+class AsyncBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   async _exec(items: any[]): Promise<any[]> {
     if (!items || !Array.isArray(items)) return [];
     
@@ -100,8 +100,8 @@ class BatchNode<S = any, P = any> extends Node<S, P> {
   }
 }
 
-// ParallelBatchNode for handling iterable inputs in parallel
-class ParallelBatchNode<S = any, P = any> extends Node<S, P> {
+// AsyncParallelBatchNode for handling iterable inputs in parallel
+class AsyncParallelBatchNode<S = any, P = any> extends AsyncNode<S, P> {
   async _exec(items: any[]): Promise<any[]> {
     if (!items || !Array.isArray(items)) return [];
     
@@ -197,9 +197,9 @@ class ParallelBatchFlow<S = any, P = Record<string, any>> extends Flow<S, P> {
 // Export classes
 export {
   BaseNode,
-  Node,
-  BatchNode,
-  ParallelBatchNode,
+  AsyncNode,
+  AsyncBatchNode,
+  AsyncParallelBatchNode,
   Flow,
   BatchFlow,
   ParallelBatchFlow

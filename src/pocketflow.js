@@ -62,7 +62,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ParallelBatchFlow = exports.BatchFlow = exports.Flow = exports.ParallelBatchNode = exports.BatchNode = exports.Node = exports.BaseNode = void 0;
+exports.ParallelBatchFlow = exports.BatchFlow = exports.Flow = exports.AsyncParallelBatchNode = exports.AsyncBatchNode = exports.AsyncNode = exports.BaseNode = void 0;
 // Base Node class with generic types - all methods are async by default
 var BaseNode = /** @class */ (function () {
     function BaseNode() {
@@ -151,10 +151,10 @@ var BaseNode = /** @class */ (function () {
     return BaseNode;
 }());
 exports.BaseNode = BaseNode;
-// Node with retry capability
-var Node = /** @class */ (function (_super) {
-    __extends(Node, _super);
-    function Node(maxRetries, wait) {
+// AsyncNode with retry capability (renamed from Node to avoid conflicts)
+var AsyncNode = /** @class */ (function (_super) {
+    __extends(AsyncNode, _super);
+    function AsyncNode(maxRetries, wait) {
         if (maxRetries === void 0) { maxRetries = 1; }
         if (wait === void 0) { wait = 0; }
         var _this = _super.call(this) || this;
@@ -163,14 +163,14 @@ var Node = /** @class */ (function (_super) {
         _this.wait = wait;
         return _this;
     }
-    Node.prototype.execFallback = function (prepRes, error) {
+    AsyncNode.prototype.execFallback = function (prepRes, error) {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 throw error;
             });
         });
     };
-    Node.prototype._exec = function (prepRes) {
+    AsyncNode.prototype._exec = function (prepRes) {
         return __awaiter(this, void 0, void 0, function () {
             var e_1;
             var _this = this;
@@ -208,16 +208,16 @@ var Node = /** @class */ (function (_super) {
             });
         });
     };
-    return Node;
+    return AsyncNode;
 }(BaseNode));
-exports.Node = Node;
-// BatchNode for handling iterable inputs
-var BatchNode = /** @class */ (function (_super) {
-    __extends(BatchNode, _super);
-    function BatchNode() {
+exports.AsyncNode = AsyncNode;
+// AsyncBatchNode for handling iterable inputs sequentially
+var AsyncBatchNode = /** @class */ (function (_super) {
+    __extends(AsyncBatchNode, _super);
+    function AsyncBatchNode() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
-    BatchNode.prototype._exec = function (items) {
+    AsyncBatchNode.prototype._exec = function (items) {
         return __awaiter(this, void 0, void 0, function () {
             var results, _i, items_1, item, _a, _b;
             return __generator(this, function (_c) {
@@ -244,16 +244,16 @@ var BatchNode = /** @class */ (function (_super) {
             });
         });
     };
-    return BatchNode;
-}(Node));
-exports.BatchNode = BatchNode;
-// ParallelBatchNode for handling iterable inputs in parallel
-var ParallelBatchNode = /** @class */ (function (_super) {
-    __extends(ParallelBatchNode, _super);
-    function ParallelBatchNode() {
+    return AsyncBatchNode;
+}(AsyncNode));
+exports.AsyncBatchNode = AsyncBatchNode;
+// AsyncParallelBatchNode for handling iterable inputs in parallel
+var AsyncParallelBatchNode = /** @class */ (function (_super) {
+    __extends(AsyncParallelBatchNode, _super);
+    function AsyncParallelBatchNode() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
-    ParallelBatchNode.prototype._exec = function (items) {
+    AsyncParallelBatchNode.prototype._exec = function (items) {
         return __awaiter(this, void 0, void 0, function () {
             var _this = this;
             return __generator(this, function (_a) {
@@ -263,9 +263,9 @@ var ParallelBatchNode = /** @class */ (function (_super) {
             });
         });
     };
-    return ParallelBatchNode;
-}(Node));
-exports.ParallelBatchNode = ParallelBatchNode;
+    return AsyncParallelBatchNode;
+}(AsyncNode));
+exports.AsyncParallelBatchNode = AsyncParallelBatchNode;
 // Flow for orchestrating nodes
 var Flow = /** @class */ (function (_super) {
     __extends(Flow, _super);

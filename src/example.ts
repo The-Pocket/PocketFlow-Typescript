@@ -1,4 +1,4 @@
-import { Node, Flow, BatchNode, ParallelBatchNode } from './pocketflow';
+import { AsyncNode, Flow, AsyncBatchNode, AsyncParallelBatchNode } from './pocketflow';
 
 // Define our shared store structure
 interface DocumentStore {
@@ -10,7 +10,7 @@ interface DocumentStore {
 }
 
 // Simple document processing nodes - now all async
-class LoadDocument extends Node<DocumentStore> {
+class LoadDocument extends AsyncNode<DocumentStore> {
   async prep(shared: DocumentStore) {
     console.log("Preparing to load document...");
     return "dummy-file.txt";
@@ -30,7 +30,7 @@ class LoadDocument extends Node<DocumentStore> {
   }
 }
 
-class AnalyzeDocument extends Node<DocumentStore> {
+class AnalyzeDocument extends AsyncNode<DocumentStore> {
   async prep(shared: DocumentStore) {
     return shared.rawText;
   }
@@ -50,7 +50,7 @@ class AnalyzeDocument extends Node<DocumentStore> {
   }
 }
 
-class SummarizeDocument extends Node<DocumentStore> {
+class SummarizeDocument extends AsyncNode<DocumentStore> {
   async prep(shared: DocumentStore) {
     return shared.rawText;
   }
@@ -67,7 +67,7 @@ class SummarizeDocument extends Node<DocumentStore> {
   }
 }
 
-class BatchSearchTerms extends ParallelBatchNode<DocumentStore> {
+class BatchSearchTerms extends AsyncParallelBatchNode<DocumentStore> {
   async prep(shared: DocumentStore) {
     // Extract search terms from text
     const text = shared.rawText || "";
