@@ -1,22 +1,33 @@
 type NonIterableObject = Record<string, unknown> & { [Symbol.iterator]?: never }
 type Action = string;
 class BaseNode<S = unknown, P extends NonIterableObject = NonIterableObject> {
-  params: P = {} as P; successors: Map<Action, BaseNode> = new Map();
-  setParams(params: P): this { this.params = params; return this; }
-  next(node: BaseNode, action: Action = "default"): BaseNode {
-    if (this.successors.has(action)) console.warn(`Overwriting successor for action '${action}'`);
-    this.successors.set(action, node); return node;
+  protected _params: P = {} as P; protected _successors: Map<Action, BaseNode> = new Map();
+  protected async _exec(prepRes: unknown): Promise<unknown> { return await this.exec(prepRes); }
+  protected async _run(shared: S): Promise<Action | undefined> {
+    const p = await this.prep(shared), e = await this._exec(p); return await this.post(shared, p, e);
   }
   async prep(shared: S): Promise<unknown> { return undefined; }
   async exec(prepRes: unknown): Promise<unknown> { return undefined; }
   async post(shared: S, prepRes: unknown, execRes: unknown): Promise<Action | undefined> { return undefined; }
-  async _exec(prepRes: unknown): Promise<unknown> { return await this.exec(prepRes); }
-  async _run(shared: S): Promise<Action | undefined> {
-    const p = await this.prep(shared), e = await this._exec(p); return await this.post(shared, p, e);
-  }
   async run(shared: S): Promise<Action | undefined> {
-    if (this.successors.size > 0) console.warn("Node won't run successors. Use Flow.");
+    if (this._successors.size > 0) console.warn("Node won't run successors. Use Flow.");
     return await this._run(shared);
+  }
+  setParams(params: P): this { this._params = params; return this; }
+  next(node: BaseNode, action: Action = "default"): BaseNode {
+    if (this._successors.has(action)) console.warn(`Overwriting successor for action '${action}'`);
+    this._successors.set(action, node); return node;
+  }
+  getNextNode(action: Action = "default"): BaseNode | undefined {
+    const nextAction = action || 'default', next = this._successors.get(nextAction)
+    if (!next && this._successors.size > 0)
+      console.warn(`Flow ends: '${nextAction}' not found in [${Array.from(this._successors.keys())}]`)
+    return next
+  }
+  clone(): this {
+    const clonedNode = Object.create(Object.getPrototypeOf(this)); Object.assign(clonedNode, this);
+    clonedNode._params = { ...this._params }; clonedNode._successors = new Map(this._successors);
+    return clonedNode;
   }
 }
 class Node<S = unknown, P extends NonIterableObject = NonIterableObject> extends BaseNode<S, P> {
@@ -54,18 +65,12 @@ class ParallelBatchNode<
 class Flow<S = unknown, P extends NonIterableObject = NonIterableObject> extends BaseNode<S, P> {
   start: BaseNode;
   constructor(start: BaseNode) { super(); this.start = start; }
-  getNextNode(current: BaseNode, action?: Action): BaseNode | undefined {
-    const nextAction = action || "default", next = current.successors.get(nextAction);
-    if (!next && current.successors.size > 0)
-      console.warn(`Flow ends: '${nextAction}' not found in [${Array.from(current.successors.keys())}]`);
-    return next;
-  }
-  async _orchestrate(shared: S, params?: P): Promise<void> {
-    let current: BaseNode | undefined = this.cloneNode(this.start);
-    const p = params || this.params;
+  protected async _orchestrate(shared: S, params?: P): Promise<void> {
+    let current: BaseNode | undefined = this.start.clone();
+    const p = params || this._params;
     while (current) {
-      current.setParams(p); const action = await current._run(shared);
-      current = this.getNextNode(current, action); if (current) current = this.cloneNode(current);
+      current.setParams(p); const action = await current.run(shared);
+      current = current.getNextNode(action); current = current?.clone();
     }
   }
   async _run(shared: S): Promise<Action | undefined> {
@@ -74,29 +79,23 @@ class Flow<S = unknown, P extends NonIterableObject = NonIterableObject> extends
     return await this.post(shared, pr, undefined);
   }
   async exec(prepRes: unknown): Promise<unknown> { throw new Error("Flow can't exec."); }
-  private cloneNode(node: BaseNode): BaseNode {
-    const clonedNode = Object.create(Object.getPrototypeOf(node));
-    Object.assign(clonedNode, node);
-    clonedNode.params = { ...node.params }; clonedNode.successors = new Map(node.successors);
-    return clonedNode;
-  }
 }
 class BatchFlow<S = unknown, P extends NonIterableObject = NonIterableObject, NP extends NonIterableObject[] = NonIterableObject[]> extends Flow<S, P> {
-  async prep(shared: S): Promise<NP> { const empty: readonly NonIterableObject[] = []; return empty as NP; }
   async _run(shared: S): Promise<Action | undefined> {
     const batchParams = await this.prep(shared);
     for (const bp of batchParams) {
-      const mergedParams = { ...this.params, ...bp };
+      const mergedParams = { ...this._params, ...bp };
       await this._orchestrate(shared, mergedParams);
     }
     return await this.post(shared, batchParams, undefined);
   }
+  async prep(shared: S): Promise<NP> { const empty: readonly NonIterableObject[] = []; return empty as NP; }
 }
 class ParallelBatchFlow<S = unknown, P extends NonIterableObject = NonIterableObject, NP extends NonIterableObject[] = NonIterableObject[]> extends BatchFlow<S, P, NP> {
   async _run(shared: S): Promise<Action | undefined> {
     const batchParams = await this.prep(shared) as NP || [];
     await Promise.all(batchParams.map(bp => {
-      const mergedParams = { ...this.params, ...bp } as P;
+      const mergedParams = { ...this._params, ...bp } as P;
       return this._orchestrate(shared, mergedParams);
     }));
     return await this.post(shared, batchParams, undefined);
