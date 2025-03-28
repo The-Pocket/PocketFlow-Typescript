@@ -235,7 +235,7 @@ describe('BatchFlow Tests', () => {
     // Create inner flow
     const innerNode = new AsyncInnerNode();
     const outerNode = new AsyncOuterNode();
-    innerNode.next(outerNode, 'next');
+    innerNode.on('next', outerNode);
 
     const shared: SharedStorage = {
       input_data: {

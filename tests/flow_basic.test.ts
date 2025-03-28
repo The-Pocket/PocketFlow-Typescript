@@ -194,9 +194,10 @@ describe('PocketFlow Tests with Node', () => {
     const addIfNegative = new AddNode(-20);
 
     // Setup with chaining
-    start.next(check);
-    check.next(addIfPositive, 'positive');
-    check.next(addIfNegative, 'negative');
+    start
+      .next(check)
+      .on('positive', addIfPositive)
+      .on('negative', addIfNegative);
 
     const pipeline = new Flow(start);
     await pipeline.run(shared);
@@ -216,9 +217,10 @@ describe('PocketFlow Tests with Node', () => {
     const addIfNegative = new AddNode(-20);
 
     // Build the flow with chaining
-    start.next(check);
-    check.next(addIfPositive, 'positive');
-    check.next(addIfNegative, 'negative');
+    start
+      .next(check)
+      .on('positive', addIfPositive)
+      .on('negative', addIfNegative);
 
     const pipeline = new Flow(start);
     await pipeline.run(shared);
@@ -239,9 +241,9 @@ describe('PocketFlow Tests with Node', () => {
     const noOp = new NoOpNode();
 
     // Build the cycle with chaining
-    n1.next(check);
-    check.next(subtract3, 'positive').next(check);
-    check.next(noOp, 'negative');
+    n1.next(check).on('positive', subtract3).on('negative', noOp);
+
+    subtract3.next(check);
 
     const pipeline = new Flow(n1);
     await pipeline.run(shared);

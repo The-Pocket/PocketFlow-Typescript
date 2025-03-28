@@ -1,5 +1,4 @@
-type NonIterableObject = Record<string, unknown> & { [Symbol.iterator]?: never }
-type Action = string;
+type NonIterableObject = Record<string, unknown> & { [Symbol.iterator]?: never }; type Action = string;
 class BaseNode<S = unknown, P extends NonIterableObject = NonIterableObject> {
   protected _params: P = {} as P; protected _successors: Map<Action, BaseNode> = new Map();
   protected async _exec(prepRes: unknown): Promise<unknown> { return await this.exec(prepRes); }
@@ -14,9 +13,10 @@ class BaseNode<S = unknown, P extends NonIterableObject = NonIterableObject> {
     return await this._run(shared);
   }
   setParams(params: P): this { this._params = params; return this; }
-  next(node: BaseNode, action: Action = "default"): BaseNode {
+  next<T extends BaseNode<S, P>>(node: T): T { this.on("default", node); return node; }
+  on(action: Action, node: BaseNode): this {
     if (this._successors.has(action)) console.warn(`Overwriting successor for action '${action}'`);
-    this._successors.set(action, node); return node;
+    this._successors.set(action, node); return this;
   }
   getNextNode(action: Action = "default"): BaseNode | undefined {
     const nextAction = action || 'default', next = this._successors.get(nextAction)
@@ -53,10 +53,7 @@ class BatchNode<S = unknown, P extends NonIterableObject = NonIterableObject> ex
     const results = []; for (const item of items) results.push(await super._exec(item)); return results;
   }
 }
-class ParallelBatchNode<
-  S = unknown,
-  P extends NonIterableObject = NonIterableObject
-> extends Node<S, P> {
+class ParallelBatchNode<S = unknown, P extends NonIterableObject = NonIterableObject> extends Node<S, P> {
   async _exec(items: unknown[]): Promise<unknown[]> {
     if (!items || !Array.isArray(items)) return []
     return Promise.all(items.map((item) => super._exec(item)))
@@ -74,8 +71,7 @@ class Flow<S = unknown, P extends NonIterableObject = NonIterableObject> extends
     }
   }
   async _run(shared: S): Promise<Action | undefined> {
-    const pr = await this.prep(shared);
-    await this._orchestrate(shared);
+    const pr = await this.prep(shared); await this._orchestrate(shared);
     return await this.post(shared, pr, undefined);
   }
   async exec(prepRes: unknown): Promise<unknown> { throw new Error("Flow can't exec."); }
