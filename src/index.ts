@@ -95,7 +95,7 @@ class ParallelBatchFlow<S = unknown, P extends NonIterableObject = NonIterableOb
   async _run(shared: S): Promise<Action | undefined> {
     const batchParams = await this.prep(shared);
     await Promise.all(batchParams.map(bp => {
-      const mergedParams = { ...this._params, ...bp } as P;
+      const mergedParams = { ...this._params, ...bp };
       return this._orchestrate(shared, mergedParams);
     }));
     return await this.post(shared, batchParams, undefined);
