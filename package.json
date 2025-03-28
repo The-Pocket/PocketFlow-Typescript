@@ -1,9 +1,13 @@
 {
   "name": "pocketflow",
+  "description": "A minimalist LLM framework",
   "version": "1.0.1",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -13,6 +17,20 @@
   },
   "files": [
     "dist"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/The-Pocket/PocketFlow-Typescript.git"
+  },
+  "keywords": [
+    "pocketflow",
+    "typescript",
+    "llm",
+    "ai",
+    "framework",
+    "workflow",
+    "minimalist"
   ],
   "scripts": {
     "build": "tsup",
