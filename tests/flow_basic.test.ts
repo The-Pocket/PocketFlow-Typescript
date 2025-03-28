@@ -8,8 +8,12 @@ type SharedStorage = {
   [key: string]: any;
 };
 
-class NumberNode extends Node<SharedStorage> {
-  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+class NumberNode extends Node<SharedStorage, Record<string, unknown>> {
+  constructor(
+    private number: number,
+    maxRetries: number = 1,
+    wait: number = 0
+  ) {
     super(maxRetries, wait);
   }
 
@@ -19,7 +23,11 @@ class NumberNode extends Node<SharedStorage> {
 }
 
 class AddNode extends Node<SharedStorage> {
-  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+  constructor(
+    private number: number,
+    maxRetries: number = 1,
+    wait: number = 0
+  ) {
     super(maxRetries, wait);
   }
 
@@ -31,7 +39,11 @@ class AddNode extends Node<SharedStorage> {
 }
 
 class MultiplyNode extends Node<SharedStorage> {
-  constructor(private number: number, maxRetries: number = 1, wait: number = 0) {
+  constructor(
+    private number: number,
+    maxRetries: number = 1,
+    wait: number = 0
+  ) {
     super(maxRetries, wait);
   }
 
@@ -70,29 +82,41 @@ class NoOpNode extends Node<SharedStorage> {
 class FlakyNode extends Node<SharedStorage> {
   private attemptCount = 0;
 
-  constructor(private failUntilAttempt: number, maxRetries: number = 3, wait: number = 0.1) {
+  constructor(
+    private failUntilAttempt: number,
+    maxRetries: number = 3,
+    wait: number = 0.1
+  ) {
     super(maxRetries, wait);
   }
 
   async exec(): Promise<any> {
     this.attemptCount++;
-    
+
     if (this.attemptCount < this.failUntilAttempt) {
       throw new Error(`Attempt ${this.attemptCount} failed`);
     }
-    
+
     return `Success on attempt ${this.attemptCount}`;
   }
 
-  async post(shared: SharedStorage, prepRes: any, execRes: any): Promise<string> {
+  async post(
+    shared: SharedStorage,
+    prepRes: any,
+    execRes: any
+  ): Promise<string> {
     shared.execResult = execRes;
-    return "default";
+    return 'default';
   }
 }
 
 // New class to demonstrate using exec method more explicitly
 class ExecNode extends Node<SharedStorage> {
-  constructor(private operation: string, maxRetries: number = 1, wait: number = 0) {
+  constructor(
+    private operation: string,
+    maxRetries: number = 1,
+    wait: number = 0
+  ) {
     super(maxRetries, wait);
   }
 
@@ -102,7 +126,7 @@ class ExecNode extends Node<SharedStorage> {
   }
 
   async exec(currentValue: number): Promise<number> {
-    switch(this.operation) {
+    switch (this.operation) {
       case 'square':
         return currentValue * currentValue;
       case 'double':
@@ -114,9 +138,13 @@ class ExecNode extends Node<SharedStorage> {
     }
   }
 
-  async post(shared: SharedStorage, prepRes: any, execRes: any): Promise<string> {
+  async post(
+    shared: SharedStorage,
+    prepRes: any,
+    execRes: any
+  ): Promise<string> {
     shared.current = execRes;
-    return "default";
+    return 'default';
   }
 }
 
@@ -133,7 +161,7 @@ describe('PocketFlow Tests with Node', () => {
     /**
      * Test a simple linear pipeline:
      * NumberNode(5) -> AddNode(3) -> MultiplyNode(2)
-     * 
+     *
      * Expected result:
      * (5 + 3) * 2 = 16
      */
@@ -169,7 +197,7 @@ describe('PocketFlow Tests with Node', () => {
     start.next(check);
     check.next(addIfPositive, 'positive');
     check.next(addIfNegative, 'negative');
-    
+
     const pipeline = new Flow(start);
     await pipeline.run(shared);
 
@@ -226,47 +254,50 @@ describe('PocketFlow Tests with Node', () => {
 
   test('retry functionality', async () => {
     const shared: SharedStorage = {};
-    
+
     // This node will fail on the first attempt but succeed on the second
     const flakyNode = new FlakyNode(2, 3, 0.01);
-    
+
     const pipeline = new Flow(flakyNode);
     await pipeline.run(shared);
-    
+
     // Check that we got a success message indicating it was the second attempt
     expect(shared.execResult).toBe('Success on attempt 2');
   });
 
   test('retry with fallback', async () => {
     const shared: SharedStorage = {};
-    
+
     // This node will always fail (requires 5 attempts, but we only allow 2)
     const flakyNode = new FlakyNode(5, 2, 0.01);
-    
+
     // Override the execFallback method to handle the failure
-    flakyNode.execFallback = async (prepRes: any, error: Error): Promise<any> => {
-      return "Fallback executed due to failure";
+    flakyNode.execFallback = async (
+      prepRes: any,
+      error: Error
+    ): Promise<any> => {
+      return 'Fallback executed due to failure';
     };
-    
+
     const pipeline = new Flow(flakyNode);
     await pipeline.run(shared);
-    
+
     // Check that we got the fallback result
     expect(shared.execResult).toBe('Fallback executed due to failure');
   });
 
   test('exec method processing', async () => {
     const shared: SharedStorage = { current: 5 };
-    
+
     const squareNode = new ExecNode('square');
     const doubleNode = new ExecNode('double');
     const negateNode = new ExecNode('negate');
-    
+
     squareNode.next(doubleNode).next(negateNode);
-    
+
     const pipeline = new Flow(squareNode);
     await pipeline.run(shared);
-    
+
     // 5 → square → 25 → double → 50 → negate → -50
     expect(shared.current).toBe(-50);
   });
