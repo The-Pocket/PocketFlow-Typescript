@@ -99,7 +99,7 @@ describe('ParallelBatchFlow Tests', () => {
     const processor = new AsyncParallelNumberProcessor(0.1);
     const aggregator = new AsyncAggregatorNode();
 
-    processor.next(aggregator, 'processed');
+    processor.on('processed', aggregator);
     const flow = new TestParallelBatchFlow(processor);
 
     const startTime = Date.now();
@@ -169,7 +169,7 @@ describe('ParallelBatchFlow Tests', () => {
     const processor = new AsyncParallelNumberProcessor(0.05);
     const aggregator = new AsyncAggregatorNode();
 
-    processor.next(aggregator, 'processed');
+    processor.on('processed', aggregator);
     const flow = new TestParallelBatchFlow(processor);
 
     await flow.run(shared);
