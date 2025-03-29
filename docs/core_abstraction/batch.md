@@ -86,7 +86,7 @@ type FileParams = {
   filename: string;
 };
 
-class SummarizeAllFiles extends BatchFlow<SharedStorage, FileParams> {
+class SummarizeAllFiles extends BatchFlow<SharedStorage> {
   async prep(shared: SharedStorage): Promise<FileParams[]> {
     return shared.files.map((filename) => ({ filename }));
   }
@@ -133,7 +133,7 @@ type FileParams = DirectoryParams & {
   filename: string;
 };
 
-class FileBatchFlow extends BatchFlow<SharedStorage, FileParams> {
+class FileBatchFlow extends BatchFlow<SharedStorage> {
   async prep(shared: SharedStorage): Promise<FileParams[]> {
     const directory = this._params.directory;
     // Get files from the directory
@@ -148,7 +148,7 @@ class FileBatchFlow extends BatchFlow<SharedStorage, FileParams> {
   }
 }
 
-class DirectoryBatchFlow extends BatchFlow<SharedStorage, DirectoryParams> {
+class DirectoryBatchFlow extends BatchFlow<SharedStorage> {
   async prep(shared: SharedStorage): Promise<DirectoryParams[]> {
     const directories = ["/path/to/dirA", "/path/to/dirB"];
     return directories.map((directory) => ({

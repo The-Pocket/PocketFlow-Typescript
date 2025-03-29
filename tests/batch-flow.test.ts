@@ -86,7 +86,7 @@ describe('BatchFlow Tests', () => {
   });
 
   test('basic async batch processing', async () => {
-    class SimpleTestBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
+    class SimpleTestBatchFlow extends BatchFlow<SharedStorage> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
         return Object.keys(shared.inputData || {}).map((k) => ({ key: k }));
       }
@@ -111,7 +111,7 @@ describe('BatchFlow Tests', () => {
   });
 
   test('empty async batch', async () => {
-    class EmptyTestBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
+    class EmptyTestBatchFlow extends BatchFlow<SharedStorage> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
         // Initialize results as an empty object
         if (!shared.results) {
@@ -144,7 +144,7 @@ describe('BatchFlow Tests', () => {
   });
 
   test('async error handling', async () => {
-    class ErrorTestBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
+    class ErrorTestBatchFlow extends BatchFlow<SharedStorage> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
         return Object.keys(shared.inputData || {}).map((k) => ({ key: k }));
       }
@@ -225,7 +225,7 @@ describe('BatchFlow Tests', () => {
       }
     }
 
-    class NestedBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
+    class NestedBatchFlow extends BatchFlow<SharedStorage> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
         return Object.keys(shared.inputData || {}).map((k) => ({ key: k }));
       }
@@ -284,7 +284,7 @@ describe('BatchFlow Tests', () => {
       }
     }
 
-    class CustomParamBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
+    class CustomParamBatchFlow extends BatchFlow<SharedStorage> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
         return Object.keys(shared.inputData || {}).map((k, i) => ({
           key: k,
