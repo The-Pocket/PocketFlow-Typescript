@@ -10,7 +10,7 @@
 
 # PocketFlow.js
 
-Pocket Flow is a TypeScript port of the original [Python version](https://github.com/The-Pocket/PocketFlow) - a minimalist LLM framework.
+PocketFlow.js is a TypeScript port of the original [Python version](https://github.com/The-Pocket/PocketFlow) - a minimalist LLM framework.
 
 ## Table of Contents
 
