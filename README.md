@@ -70,6 +70,16 @@ We welcome contributions from the community! Here's how you can help:
 
 Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md) to foster an inclusive community.
 
+### CI/CD Workflow
+
+We use GitHub Actions for continuous integration and deployment:
+
+- **CI Workflow**: Automatically runs tests and builds the project on each push and pull request to the main branch.
+- **Code Quality**: Checks TypeScript compilation to ensure code quality.
+- **Release**: Publishes the package to npm when a new release is created.
+
+Note: To publish to npm, maintainers need to configure the `NPM_TOKEN` secret in the repository settings.
+
 ### How to Contribute
 
 1. **Fork the Repository**
