@@ -17,17 +17,17 @@ A **Node** is the smallest building block. Each Node has 3 steps `prep->exec->po
 
    - **Read and preprocess data** from `shared` store.
    - Examples: _query DB, read files, or serialize data into a string_.
-   - Return `prep_res`, which is used by `exec()` and `post()`.
+   - Return `prepRes`, which is used by `exec()` and `post()`.
 
-2. `exec(prep_res)`
+2. `exec(prepRes)`
 
    - **Execute compute logic**, with optional retries and error handling (below).
    - Examples: _(mostly) LLM calls, remote APIs, tool use_.
    - ⚠️ This shall be only for compute and **NOT** access `shared`.
    - ⚠️ If retries enabled, ensure idempotent implementation.
-   - Return `exec_res`, which is passed to `post()`.
+   - Return `execRes`, which is passed to `post()`.
 
-3. `post(shared, prep_res, exec_res)`
+3. `post(shared, prepRes, execRes)`
    - **Postprocess and write data** back to `shared`.
    - Examples: _update DB, change states, log results_.
    - **Decide the next action** by returning a _string_ (`action = "default"` if _None_).
