@@ -7,7 +7,7 @@ nav_order: 5
 
 # Embedding
 
-Below you will find an overview table of various text embedding APIs, along with example TypeScript code that aligns with PocketFlow design patterns.
+Below you will find an overview table of various text embedding APIs, along with example TypeScript code.
 
 > Embedding is more a micro optimization, compared to the Flow Design.
 >
@@ -26,80 +26,65 @@ Below you will find an overview table of various text embedding APIs, along with
 
 ## Example TypeScript Code
 
-Here are examples of how to use embedding APIs with TypeScript in PocketFlow. You can create utility functions for embedding and then use them with PocketFlow nodes.
-
 ### 1. OpenAI
 
 ```typescript
 import OpenAI from "openai";
 
-// Utility function
-async function getOpenAIEmbedding(text: string): Promise<number[]> {
-  const client = new OpenAI({ apiKey: "YOUR_API_KEY" });
-  const response = await client.embeddings.create({
-    model: "text-embedding-3-small", // Updated to use the v3 model
+const openai = new OpenAI({
+  apiKey: "YOUR_API_KEY",
+});
+
+async function getEmbedding(text: string) {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-ada-002",
     input: text,
   });
 
-  return response.data[0].embedding;
+  // Extract the embedding vector from the response
+  const embedding = response.data[0].embedding;
+  console.log(embedding);
+  return embedding;
 }
 
-// Example Node implementation
-class EmbedDocument extends Node<YourSharedStorageType> {
-  async prep(shared: YourSharedStorageType): Promise<string> {
-    return shared.document || "";
-  }
-
-  async exec(document: string): Promise<number[]> {
-    return await getOpenAIEmbedding(document);
-  }
-
-  async post(
-    shared: YourSharedStorageType,
-    prepRes: string,
-    embedding: number[]
-  ): Promise<string | undefined> {
-    shared.embedding = embedding;
-    return undefined;
-  }
-}
+// Usage
+getEmbedding("Hello world");
 ```
 
 ### 2. Azure OpenAI
 
 ```typescript
-import { OpenAIClient, AzureKeyCredential } from "@azure/openai";
+import { AzureOpenAI } from "openai";
+import {
+  getBearerTokenProvider,
+  DefaultAzureCredential,
+} from "@azure/identity";
 
-// Utility function
-async function getAzureEmbedding(text: string): Promise<number[]> {
-  const client = new OpenAIClient(
-    "https://YOUR_RESOURCE_NAME.openai.azure.com",
-    new AzureKeyCredential("YOUR_AZURE_API_KEY")
-  );
+// Using Azure credentials (recommended)
+const credential = new DefaultAzureCredential();
+const scope = "https://cognitiveservices.azure.com/.default";
+const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 
-  const result = await client.getEmbeddings("YOUR_DEPLOYMENT_NAME", [text]);
-  return result.data[0].embedding;
+// Or using API key directly
+const client = new AzureOpenAI({
+  apiKey: "YOUR_AZURE_API_KEY",
+  endpoint: "https://YOUR_RESOURCE_NAME.openai.azure.com",
+  apiVersion: "2023-05-15", // Update to the latest version
+});
+
+async function getEmbedding(text: string) {
+  const response = await client.embeddings.create({
+    model: "text-embedding-ada-002", // Or your deployment name
+    input: text,
+  });
+
+  const embedding = response.data[0].embedding;
+  console.log(embedding);
+  return embedding;
 }
 
-// Example Node implementation
-class EmbedWithAzure extends Node<YourSharedStorageType> {
-  async prep(shared: YourSharedStorageType): Promise<string> {
-    return shared.text || "";
-  }
-
-  async exec(text: string): Promise<number[]> {
-    return await getAzureEmbedding(text);
-  }
-
-  async post(
-    shared: YourSharedStorageType,
-    prepRes: string,
-    embedding: number[]
-  ): Promise<string | undefined> {
-    shared.embedding = embedding;
-    return undefined;
-  }
-}
+// Usage
+getEmbedding("Hello world");
 ```
 
 ### 3. Google Vertex AI
@@ -107,39 +92,27 @@ class EmbedWithAzure extends Node<YourSharedStorageType> {
 ```typescript
 import { VertexAI } from "@google-cloud/vertexai";
 
-// Utility function
-async function getVertexAIEmbedding(text: string): Promise<number[]> {
-  const vertexAI = new VertexAI({
-    project: "YOUR_GCP_PROJECT_ID",
-    location: "us-central1",
+// Initialize Vertex with your Google Cloud project and location
+const vertex = new VertexAI({
+  project: "YOUR_GCP_PROJECT_ID",
+  location: "us-central1",
+});
+
+// Access embeddings model
+const model = vertex.preview.getTextEmbeddingModel("textembedding-gecko@001");
+
+async function getEmbedding(text: string) {
+  const response = await model.getEmbeddings({
+    texts: [text],
   });
 
-  const embedModel = vertexAI.preview.getTextEmbeddingModel(
-    "textembedding-gecko@001"
-  );
-  const result = await embedModel.getEmbeddings([text]);
-  return result.embeddings[0].values;
+  const embedding = response.embeddings[0].values;
+  console.log(embedding);
+  return embedding;
 }
 
-// Example BatchNode implementation for multiple texts
-class BatchEmbedWithVertexAI extends BatchNode<YourSharedStorageType> {
-  async prep(shared: YourSharedStorageType): Promise<string[]> {
-    return shared.textChunks || [];
-  }
-
-  async exec(chunk: string): Promise<number[]> {
-    return await getVertexAIEmbedding(chunk);
-  }
-
-  async post(
-    shared: YourSharedStorageType,
-    prepRes: string[],
-    embeddings: number[][]
-  ): Promise<string | undefined> {
-    shared.embeddings = embeddings;
-    return undefined;
-  }
-}
+// Usage
+getEmbedding("Hello world");
 ```
 
 ### 4. AWS Bedrock
@@ -150,40 +123,35 @@ import {
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 
-// Utility function
-async function getBedrockEmbedding(text: string): Promise<number[]> {
-  const client = new BedrockRuntimeClient({ region: "us-east-1" });
+const client = new BedrockRuntimeClient({
+  region: "us-east-1", // Use your AWS region
+});
+
+async function getEmbedding(text: string) {
+  const modelId = "amazon.titan-embed-text-v2:0";
+  const input = {
+    inputText: text,
+    dimensions: 1536, // Optional: specify embedding dimensions
+    normalize: true, // Optional: normalize embeddings
+  };
 
   const command = new InvokeModelCommand({
-    modelId: "amazon.titan-embed-text-v2:0",
+    modelId: modelId,
     contentType: "application/json",
-    body: JSON.stringify({ inputText: text }),
+    accept: "application/json",
+    body: JSON.stringify(input),
   });
 
   const response = await client.send(command);
   const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-  return responseBody.embedding;
+  const embedding = responseBody.embedding;
+
+  console.log(embedding);
+  return embedding;
 }
 
-// Example implementation in a Node
-class EmbedWithBedrock extends Node<YourSharedStorageType> {
-  async prep(shared: YourSharedStorageType): Promise<string> {
-    return shared.text || "";
-  }
-
-  async exec(text: string): Promise<number[]> {
-    return await getBedrockEmbedding(text);
-  }
-
-  async post(
-    shared: YourSharedStorageType,
-    prepRes: string,
-    embedding: number[]
-  ): Promise<string | undefined> {
-    shared.embedding = embedding;
-    return undefined;
-  }
-}
+// Usage
+getEmbedding("Hello world");
 ```
 
 ### 5. Cohere
@@ -191,39 +159,24 @@ class EmbedWithBedrock extends Node<YourSharedStorageType> {
 ```typescript
 import { CohereClient } from "cohere-ai";
 
-// Utility function
-async function getCohereEmbedding(text: string): Promise<number[]> {
-  const cohere = new CohereClient({
-    token: "YOUR_API_KEY",
-  });
+const cohere = new CohereClient({
+  token: "YOUR_API_KEY",
+});
 
+async function getEmbedding(text: string) {
   const response = await cohere.embed({
     texts: [text],
-    model: "embed-english-v3.0",
+    model: "embed-english-v3.0", // Use the latest model
+    inputType: "search_query",
   });
 
-  return response.embeddings[0];
+  const embedding = response.embeddings[0];
+  console.log(embedding);
+  return embedding;
 }
 
-// Example Node implementation
-class EmbedWithCohere extends Node<YourSharedStorageType> {
-  async prep(shared: YourSharedStorageType): Promise<string> {
-    return shared.text || "";
-  }
-
-  async exec(text: string): Promise<number[]> {
-    return await getCohereEmbedding(text);
-  }
-
-  async post(
-    shared: YourSharedStorageType,
-    prepRes: string,
-    embedding: number[]
-  ): Promise<string | undefined> {
-    shared.embedding = embedding;
-    return undefined;
-  }
-}
+// Usage
+getEmbedding("Hello world");
 ```
 
 ### 6. Hugging Face
@@ -231,37 +184,24 @@ class EmbedWithCohere extends Node<YourSharedStorageType> {
 ```typescript
 import { InferenceClient } from "@huggingface/inference";
 
-// Utility function
-async function getHuggingFaceEmbedding(text: string): Promise<number[]> {
-  const hf = new InferenceClient("YOUR_HF_TOKEN");
+const hf = new InferenceClient({
+  apiToken: "YOUR_HF_TOKEN",
+});
+
+async function getEmbedding(text: string) {
+  const model = "sentence-transformers/all-MiniLM-L6-v2";
 
   const response = await hf.featureExtraction({
-    model: "sentence-transformers/all-MiniLM-L6-v2",
+    model: model,
     inputs: text,
   });
 
+  console.log(response);
   return response;
 }
 
-// Example Node implementation
-class EmbedWithHuggingFace extends Node<YourSharedStorageType> {
-  async prep(shared: YourSharedStorageType): Promise<string> {
-    return shared.text || "";
-  }
-
-  async exec(text: string): Promise<number[]> {
-    return await getHuggingFaceEmbedding(text);
-  }
-
-  async post(
-    shared: YourSharedStorageType,
-    prepRes: string,
-    embedding: number[]
-  ): Promise<string | undefined> {
-    shared.embedding = embedding;
-    return undefined;
-  }
-}
+// Usage
+getEmbedding("Hello world");
 ```
 
 ### 7. Jina
@@ -269,196 +209,26 @@ class EmbedWithHuggingFace extends Node<YourSharedStorageType> {
 ```typescript
 import axios from "axios";
 
-// Utility function
-async function getJinaEmbedding(text: string): Promise<number[]> {
-  const response = await axios.post(
-    "https://api.jina.ai/v1/embeddings",
-    {
-      input: [text],
-      model: "jina-embeddings-v2-base-en",
-      normalized: true,
-    },
-    {
-      headers: {
-        Authorization: "Bearer YOUR_JINA_TOKEN",
-        "Content-Type": "application/json",
-      },
-    }
-  );
+async function getEmbedding(text: string) {
+  const url = "https://api.jina.ai/v1/embeddings";
+  const headers = {
+    Authorization: `Bearer YOUR_JINA_TOKEN`,
+    "Content-Type": "application/json",
+  };
 
-  return response.data.data[0].embedding;
+  const payload = {
+    model: "jina-embeddings-v3",
+    input: [text],
+    normalized: true,
+  };
+
+  const response = await axios.post(url, payload, { headers });
+  const embedding = response.data.data[0].embedding;
+
+  console.log(embedding);
+  return embedding;
 }
 
-// Example Node implementation
-class EmbedWithJina extends Node<YourSharedStorageType> {
-  async prep(shared: YourSharedStorageType): Promise<string> {
-    return shared.text || "";
-  }
-
-  async exec(text: string): Promise<number[]> {
-    return await getJinaEmbedding(text);
-  }
-
-  async post(
-    shared: YourSharedStorageType,
-    prepRes: string,
-    embedding: number[]
-  ): Promise<string | undefined> {
-    shared.embedding = embedding;
-    return undefined;
-  }
-}
-```
-
-## PocketFlow RAG Implementation Example
-
-Here's a complete example of using embeddings in a Retrieval-Augmented Generation (RAG) pattern with PocketFlow:
-
-```typescript
-import { Node, BatchNode, Flow } from "pocketflow";
-
-// Define shared storage type for RAG pattern
-type RAGSharedStorage = {
-  documents?: string[];
-  chunks?: string[];
-  embeddings?: number[][];
-  index?: any;
-  question?: string;
-  questionEmbedding?: number[];
-  retrievedChunk?: string;
-  answer?: string;
-};
-
-// Utility functions
-async function getEmbedding(text: string): Promise<number[]> {
-  // Replace with your preferred embedding API
-  // This is just a placeholder
-  return Array.from(text.substring(0, 5)).map((char) => char.charCodeAt(0));
-}
-
-async function createIndex(
-  embeddings: number[][]
-): Promise<{ embeddings: number[][] }> {
-  // In a real implementation, use a vector database
-  return { embeddings };
-}
-
-async function searchIndex(
-  index: { embeddings: number[][] },
-  queryEmbedding: number[],
-  options: { topK: number }
-): Promise<[number[][], number[][]]> {
-  // Simple similarity search
-  const similarities = index.embeddings.map((emb, idx) => {
-    const similarity = emb.reduce(
-      (sum, val, i) => sum + val * (queryEmbedding[i] || 0),
-      0
-    );
-    return [idx, similarity];
-  });
-
-  similarities.sort((a, b) => b[1] - a[1]);
-
-  const topK = Math.min(options.topK, similarities.length);
-  const indices = [similarities.slice(0, topK).map((s) => s[0])];
-  const distances = [similarities.slice(0, topK).map((s) => s[1])];
-
-  return [indices, distances];
-}
-
-// Indexing Pipeline Nodes
-class ChunkDocuments extends Node<RAGSharedStorage> {
-  async prep(shared: RAGSharedStorage): Promise<string[]> {
-    return shared.documents || [];
-  }
-
-  async exec(documents: string[]): Promise<string[]> {
-    // Simple chunking by splitting on paragraphs
-    const chunks: string[] = [];
-    for (const doc of documents) {
-      const paragraphs = doc.split("\n\n");
-      chunks.push(...paragraphs);
-    }
-    return chunks;
-  }
-
-  async post(
-    shared: RAGSharedStorage,
-    prepRes: string[],
-    chunks: string[]
-  ): Promise<string | undefined> {
-    shared.chunks = chunks;
-    return undefined;
-  }
-}
-
-class EmbedDocuments extends BatchNode<RAGSharedStorage> {
-  async prep(shared: RAGSharedStorage): Promise<string[]> {
-    return shared.chunks || [];
-  }
-
-  async exec(chunk: string): Promise<number[]> {
-    return await getEmbedding(chunk);
-  }
-
-  async post(
-    shared: RAGSharedStorage,
-    prepRes: string[],
-    embeddings: number[][]
-  ): Promise<string | undefined> {
-    shared.embeddings = embeddings;
-    return undefined;
-  }
-}
-
-class CreateIndex extends Node<RAGSharedStorage> {
-  async prep(shared: RAGSharedStorage): Promise<number[][]> {
-    return shared.embeddings || [];
-  }
-
-  async exec(embeddings: number[][]): Promise<unknown> {
-    return await createIndex(embeddings);
-  }
-
-  async post(
-    shared: RAGSharedStorage,
-    prepRes: number[][],
-    index: unknown
-  ): Promise<string | undefined> {
-    shared.index = index;
-    return undefined;
-  }
-}
-
-// Query Pipeline Nodes
-class EmbedQuery extends Node<RAGSharedStorage> {
-  async prep(shared: RAGSharedStorage): Promise<string> {
-    return shared.question || "";
-  }
-
-  async exec(question: string): Promise<number[]> {
-    return await getEmbedding(question);
-  }
-
-  async post(
-    shared: RAGSharedStorage,
-    prepRes: string,
-    embedding: number[]
-  ): Promise<string | undefined> {
-    shared.questionEmbedding = embedding;
-    return undefined;
-  }
-}
-
-// Usage example:
-// const indexingFlow = new Flow(new ChunkDocuments().next(new EmbedDocuments()).next(new CreateIndex()));
-// const queryFlow = new Flow(new EmbedQuery());
-//
-// const shared: RAGSharedStorage = {
-//   documents: ["Your document text here"]
-// };
-//
-// await indexingFlow.run(shared);
-// shared.question = "Your question here?";
-// await queryFlow.run(shared);
+// Usage
+getEmbedding("Hello world");
 ```

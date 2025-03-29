@@ -7,13 +7,8 @@ nav_order: 1
 
 # LLM Wrappers
 
-For a unified interface to multiple LLM providers, check out these popular TypeScript libraries:
-
-- [LangChain.js](https://github.com/langchain-ai/langchainjs) - A comprehensive framework for building LLM applications with 13.8k+ GitHub stars
-- [ModelFusion](https://github.com/vercel/modelfusion) - A TypeScript library for building AI applications with 1.2k+ GitHub stars, now part of Vercel
-- [Firebase Genkit](https://firebase.google.com/docs/genkit) - An official Google/Firebase toolkit for integrating AI models with unified APIs
-
-Here, we provide some minimal example implementations for direct API integration:
+Check out popular libraries like [LangChain](https://github.com/langchain-ai/langchainjs) (13.8k+ GitHub stars), [ModelFusion](https://github.com/vercel/modelfusion) (1.2k+ GitHub stars), or [Firebase GenKit](https://firebase.google.com/docs/genkit) for unified LLM interfaces.
+Here, we provide some minimal example implementations:
 
 1. OpenAI
 
@@ -21,18 +16,16 @@ Here, we provide some minimal example implementations for direct API integration
    import { OpenAI } from "openai";
 
    async function callLlm(prompt: string): Promise<string> {
-     const client = new OpenAI({
-       apiKey: process.env.OPENAI_API_KEY,
-     });
-     const completion = await client.chat.completions.create({
+     const client = new OpenAI({ apiKey: "YOUR_API_KEY_HERE" });
+     const r = await client.chat.completions.create({
        model: "gpt-4o",
        messages: [{ role: "user", content: prompt }],
      });
-     return completion.choices[0].message.content || "";
+     return r.choices[0].message.content || "";
    }
 
    // Example usage
-   await callLlm("How are you?");
+   callLlm("How are you?").then(console.log);
    ```
 
    > Store the API key in an environment variable like OPENAI_API_KEY for security.
@@ -45,10 +38,10 @@ Here, we provide some minimal example implementations for direct API integration
 
    async function callLlm(prompt: string): Promise<string> {
      const client = new Anthropic({
-       apiKey: process.env.ANTHROPIC_API_KEY,
+       apiKey: "YOUR_API_KEY_HERE",
      });
      const response = await client.messages.create({
-       model: "claude-3-5-sonnet-20240620",
+       model: "claude-3-7-sonnet-20250219",
        max_tokens: 3000,
        messages: [{ role: "user", content: prompt }],
      });
@@ -56,18 +49,26 @@ Here, we provide some minimal example implementations for direct API integration
    }
    ```
 
-3. Google (Generative AI)
+3. Google (Vertex AI)
 
    ```typescript
-   import { GoogleGenerativeAI } from "@google/generative-ai";
+   import { VertexAI } from "@google-cloud/vertexai";
 
    async function callLlm(prompt: string): Promise<string> {
-     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-     const model = genAI.getGenerativeModel({
+     const vertexAI = new VertexAI({
+       project: "YOUR_PROJECT_ID",
+       location: "us-central1",
+     });
+
+     const generativeModel = vertexAI.getGenerativeModel({
        model: "gemini-1.5-flash",
      });
-     const result = await model.generateContent(prompt);
-     return result.response.text();
+
+     const response = await generativeModel.generateContent({
+       contents: [{ role: "user", parts: [{ text: prompt }] }],
+     });
+
+     return response.response.candidates[0].content.parts[0].text;
    }
    ```
 
@@ -78,211 +79,93 @@ Here, we provide some minimal example implementations for direct API integration
 
    async function callLlm(prompt: string): Promise<string> {
      const client = new AzureOpenAI({
-       apiKey: process.env.AZURE_OPENAI_API_KEY,
-       endpoint: "https://<YOUR_RESOURCE_NAME>.openai.azure.com",
-       apiVersion: "2024-02-01",
+       apiKey: "YOUR_API_KEY_HERE",
+       azure: {
+         apiVersion: "2023-05-15",
+         endpoint: "https://<YOUR_RESOURCE_NAME>.openai.azure.com/",
+       },
      });
-     const completion = await client.chat.completions.create({
+
+     const r = await client.chat.completions.create({
        model: "<YOUR_DEPLOYMENT_NAME>",
        messages: [{ role: "user", content: prompt }],
      });
-     return completion.choices[0].message.content || "";
+
+     return r.choices[0].message.content || "";
    }
    ```
 
 5. Ollama (Local LLM)
 
    ```typescript
-   import { Ollama } from "ollama";
+   import ollama from "ollama";
 
    async function callLlm(prompt: string): Promise<string> {
-     const ollama = new Ollama();
      const response = await ollama.chat({
-       model: "llama3.1",
+       model: "llama2",
        messages: [{ role: "user", content: prompt }],
      });
      return response.message.content;
    }
    ```
 
-## Integration with PocketFlow
-
-You can integrate these LLM functions with the PocketFlow Node class:
-
-```typescript
-import { Node } from "pocketflow";
-import { OpenAI } from "openai";
-
-// Define a properly typed interface for chat messages
-interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
-// LLM Node implementation that integrates with PocketFlow
-class LlmNode<
-  S = unknown,
-  P extends Record<string, unknown> = Record<string, unknown>
-> extends Node<S, P> {
-  private client: OpenAI;
-  private model: string;
-
-  constructor(maxRetries: number = 3, waitSeconds: number = 2) {
-    super(maxRetries, waitSeconds);
-    this.client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    this.model = "gpt-4o";
-  }
-
-  async exec(prompt: string): Promise<string> {
-    const completion = await this.client.chat.completions.create({
-      model: this.model,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return completion.choices[0].message.content || "";
-  }
-
-  async execFallback(prompt: string, error: Error): Promise<string> {
-    console.error("LLM call failed:", error.message);
-    return "I encountered an error processing your request.";
-  }
-}
-
-// Example usage in a flow
-const summarizeNode = new LlmNode(3, 2);
-const translateNode = new LlmNode(2, 1);
-
-// Create a simple flow
-const flow = new Flow(summarizeNode);
-summarizeNode.next(translateNode);
-
-// Set custom prompts via params
-summarizeNode.setParams({ prompt: "Summarize the following text: {{text}}" });
-translateNode.setParams({ prompt: "Translate to French: {{text}}" });
-```
-
 ## Improvements
 
-Here are some ways to enhance your LLM integration:
+Feel free to enhance your `callLlm` function as needed. Here are examples:
 
-- Chat history handling with properly typed messages:
+- Handle chat history:
 
 ```typescript
-import { OpenAI } from "openai";
-import { Node } from "pocketflow";
-
-interface ChatMessage {
+interface Message {
   role: "user" | "assistant" | "system";
   content: string;
 }
 
-class ChatNode extends Node {
-  private client: OpenAI;
-  private model: string;
+async function callLlm(messages: Message[]): Promise<string> {
+  const client = new OpenAI({ apiKey: "YOUR_API_KEY_HERE" });
+  const r = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: messages,
+  });
+  return r.choices[0].message.content || "";
+}
+```
 
-  constructor(maxRetries: number = 2, waitSeconds: number = 1) {
-    super(maxRetries, waitSeconds);
-    this.client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    this.model = "gpt-4o";
+- Add in-memory caching
+
+```typescript
+import { memoize } from "lodash";
+
+const callLlmMemoized = memoize(async (prompt: string): Promise<string> => {
+  // Your implementation here
+  return "";
+});
+
+async function callLlm(prompt: string, useCache = true): Promise<string> {
+  if (useCache) {
+    return callLlmMemoized(prompt);
   }
+  // Call the underlying function directly
+  return callLlmInternal(prompt);
+}
 
-  async exec(messages: ChatMessage[]): Promise<string> {
-    const completion = await this.client.chat.completions.create({
-      model: this.model,
-      messages: messages,
-    });
-    return completion.choices[0].message.content || "";
+class SummarizeNode {
+  private curRetry = 0;
+
+  async exec(text: string): Promise<string> {
+    return callLlm(`Summarize: ${text}`, this.curRetry === 0);
   }
 }
 ```
 
-- Add in-memory caching that works with retries:
+- Enable logging:
 
 ```typescript
-import NodeCache from "node-cache";
-import { Node } from "pocketflow";
-import { OpenAI } from "openai";
-
-// Create a cache instance
-const cache = new NodeCache({ stdTTL: 3600 }); // 1 hour TTL
-
-class CachedLlmNode extends Node {
-  private client: OpenAI;
-  private model: string;
-
-  constructor(maxRetries: number = 2, waitSeconds: number = 1) {
-    super(maxRetries, waitSeconds);
-    this.client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    this.model = "gpt-4o";
-  }
-
-  async exec(prompt: string): Promise<string> {
-    // Only use cache on first attempt (not on retries)
-    if (this.currentRetry === 0) {
-      const cachedResult = cache.get<string>(prompt);
-      if (cachedResult) {
-        return cachedResult;
-      }
-    }
-
-    const completion = await this.client.chat.completions.create({
-      model: this.model,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const result = completion.choices[0].message.content || "";
-
-    // Only cache successful results
-    if (result) {
-      cache.set(prompt, result);
-    }
-
-    return result;
-  }
-}
-```
-
-- Enable logging for monitoring:
-
-```typescript
-import { Node } from "pocketflow";
-import { OpenAI } from "openai";
-
-class LoggingLlmNode extends Node {
-  private client: OpenAI;
-  private model: string;
-
-  constructor(maxRetries: number = 2, waitSeconds: number = 1) {
-    super(maxRetries, waitSeconds);
-    this.client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    this.model = "gpt-4o";
-  }
-
-  async exec(prompt: string): Promise<string> {
-    console.info(
-      `LLM Request (attempt ${this.currentRetry + 1}/${
-        this.maxRetries
-      }): ${prompt.substring(0, 50)}...`
-    );
-
-    const startTime = Date.now();
-    const completion = await this.client.chat.completions.create({
-      model: this.model,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const duration = Date.now() - startTime;
-
-    const result = completion.choices[0].message.content || "";
-    console.info(`LLM Response (${duration}ms): ${result.substring(0, 50)}...`);
-
-    return result;
-  }
+async function callLlm(prompt: string): Promise<string> {
+  console.info(`Prompt: ${prompt}`);
+  // Your implementation here
+  const response = ""; // Response from your implementation
+  console.info(`Response: ${response}`);
+  return response;
 }
 ```
