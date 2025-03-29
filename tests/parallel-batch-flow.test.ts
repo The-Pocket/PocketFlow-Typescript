@@ -4,14 +4,13 @@ import { Node, ParallelBatchNode, Flow, ParallelBatchFlow } from '../src/index';
 // Define shared storage type
 type SharedStorage = {
   batches?: number[][];
-  processed_numbers?: Record<number, number[]>;
+  processedNumbers?: Record<number, number[]>;
   total?: number;
-  [key: string]: any;
 };
 
 class AsyncParallelNumberProcessor extends ParallelBatchNode<
   SharedStorage,
-  { batch_id: number }
+  { batchId: number }
 > {
   private delay: number;
 
@@ -21,7 +20,7 @@ class AsyncParallelNumberProcessor extends ParallelBatchNode<
   }
 
   async prep(shared: SharedStorage): Promise<number[]> {
-    const batchId = this._params.batch_id;
+    const batchId = this._params.batchId;
     return shared.batches?.[batchId] || [];
   }
 
@@ -36,10 +35,10 @@ class AsyncParallelNumberProcessor extends ParallelBatchNode<
     prepRes: number[],
     execRes: number[]
   ): Promise<string | undefined> {
-    if (!shared.processed_numbers) {
-      shared.processed_numbers = {};
+    if (!shared.processedNumbers) {
+      shared.processedNumbers = {};
     }
-    shared.processed_numbers[this._params.batch_id] = execRes;
+    shared.processedNumbers[this._params.batchId] = execRes;
     return 'processed';
   }
 }
@@ -52,7 +51,7 @@ class AsyncAggregatorNode extends Node<SharedStorage> {
   async prep(shared: SharedStorage): Promise<number[]> {
     // Combine all batch results in order
     const allResults: number[] = [];
-    const processed = shared.processed_numbers || {};
+    const processed = shared.processedNumbers || {};
 
     for (let i = 0; i < Object.keys(processed).length; i++) {
       allResults.push(...processed[i]);
@@ -76,10 +75,10 @@ class AsyncAggregatorNode extends Node<SharedStorage> {
   }
 }
 
-// Custom ParallelBatchFlow that processes batches based on batch_id
+// Custom ParallelBatchFlow that processes batches based on batchId
 class TestParallelBatchFlow extends ParallelBatchFlow<SharedStorage> {
   async prep(shared: SharedStorage): Promise<Record<string, any>[]> {
-    return (shared.batches || []).map((_, i) => ({ batch_id: i }));
+    return (shared.batches || []).map((_, i) => ({ batchId: i }));
   }
 }
 
@@ -90,9 +89,9 @@ describe('ParallelBatchFlow Tests', () => {
      */
     const shared: SharedStorage = {
       batches: [
-        [1, 2, 3], // batch_id: 0
-        [4, 5, 6], // batch_id: 1
-        [7, 8, 9], // batch_id: 2
+        [1, 2, 3], // batchId: 0
+        [4, 5, 6], // batchId: 1
+        [7, 8, 9], // batchId: 2
       ],
     };
 
@@ -113,7 +112,7 @@ describe('ParallelBatchFlow Tests', () => {
       2: [14, 16, 18], // [7,8,9] * 2
     };
 
-    expect(shared.processed_numbers).toEqual(expectedBatchResults);
+    expect(shared.processedNumbers).toEqual(expectedBatchResults);
 
     // Verify total
     const expectedTotal = shared
@@ -159,10 +158,10 @@ describe('ParallelBatchFlow Tests', () => {
      */
     const shared: SharedStorage = {
       batches: [
-        [1], // batch_id: 0
-        [2, 3, 4], // batch_id: 1
-        [5, 6], // batch_id: 2
-        [7, 8, 9, 10], // batch_id: 3
+        [1], // batchId: 0
+        [2, 3, 4], // batchId: 1
+        [5, 6], // batchId: 2
+        [7, 8, 9, 10], // batchId: 3
       ],
     };
 
@@ -182,7 +181,7 @@ describe('ParallelBatchFlow Tests', () => {
       3: [14, 16, 18, 20], // [7,8,9,10] * 2
     };
 
-    expect(shared.processed_numbers).toEqual(expectedBatchResults);
+    expect(shared.processedNumbers).toEqual(expectedBatchResults);
 
     // Verify total
     const expectedTotal = shared

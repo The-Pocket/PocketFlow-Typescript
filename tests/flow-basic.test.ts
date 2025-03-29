@@ -5,7 +5,6 @@ import { Node, Flow } from '../src/index';
 type SharedStorage = {
   current?: number;
   execResult?: any;
-  [key: string]: any;
 };
 
 class NumberNode extends Node<SharedStorage, Record<string, unknown>> {

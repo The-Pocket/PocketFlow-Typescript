@@ -7,17 +7,16 @@ type SharedStorage = {
     attempts: number;
     result: string;
   }>;
-  final_result?: any;
-  [key: string]: any;
+  finalResult?: any;
 };
 
 class FallbackNode extends Node<SharedStorage> {
-  private should_fail: boolean;
-  private attempt_count: number = 0;
+  private shouldFail: boolean;
+  private attemptCount: number = 0;
   
-  constructor(should_fail: boolean = true, maxRetries: number = 1, wait: number = 0) {
+  constructor(shouldFail: boolean = true, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
-    this.should_fail = should_fail;
+    this.shouldFail = shouldFail;
   }
   
   async prep(shared: SharedStorage): Promise<null> {
@@ -27,34 +26,34 @@ class FallbackNode extends Node<SharedStorage> {
     return null;
   }
   
-  async exec(prep_result: null): Promise<string> {
-    this.attempt_count++;
-    if (this.should_fail) {
+  async exec(prepResult: null): Promise<string> {
+    this.attemptCount++;
+    if (this.shouldFail) {
       throw new Error("Intentional failure");
     }
     return "success";
   }
   
-  async execFallback(prep_result: null, error: Error): Promise<string> {
+  async execFallback(prepResult: null, error: Error): Promise<string> {
     return "fallback";
   }
   
-  async post(shared: SharedStorage, prep_result: null, exec_result: string): Promise<string | undefined> {
+  async post(shared: SharedStorage, prepResult: null, execResult: string): Promise<string | undefined> {
     shared.results?.push({
-      attempts: this.attempt_count,
-      result: exec_result
+      attempts: this.attemptCount,
+      result: execResult
     });
     return undefined;
   }
 }
 
 class AsyncFallbackNode extends Node<SharedStorage> {
-  private should_fail: boolean;
-  private attempt_count: number = 0;
+  private shouldFail: boolean;
+  private attemptCount: number = 0;
   
-  constructor(should_fail: boolean = true, maxRetries: number = 1, wait: number = 0) {
+  constructor(shouldFail: boolean = true, maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
-    this.should_fail = should_fail;
+    this.shouldFail = shouldFail;
   }
   
   async prep(shared: SharedStorage): Promise<null> {
@@ -64,24 +63,24 @@ class AsyncFallbackNode extends Node<SharedStorage> {
     return null;
   }
   
-  async exec(prep_result: null): Promise<string> {
-    this.attempt_count++;
-    if (this.should_fail) {
+  async exec(prepResult: null): Promise<string> {
+    this.attemptCount++;
+    if (this.shouldFail) {
       throw new Error("Intentional async failure");
     }
     return "success";
   }
   
-  async execFallback(prep_result: null, error: Error): Promise<string> {
+  async execFallback(prepResult: null, error: Error): Promise<string> {
     // Simulate async work
     await new Promise(resolve => setTimeout(resolve, 10));
     return "async_fallback";
   }
   
-  async post(shared: SharedStorage, prep_result: null, exec_result: string): Promise<string | undefined> {
+  async post(shared: SharedStorage, prepResult: null, execResult: string): Promise<string | undefined> {
     shared.results?.push({
-      attempts: this.attempt_count,
-      result: exec_result
+      attempts: this.attemptCount,
+      result: execResult
     });
     return undefined;
   }
@@ -97,12 +96,12 @@ class ResultNode extends Node<SharedStorage> {
     return shared.results || [];
   }
   
-  async exec(prep_result: any): Promise<any> {
-    return prep_result;
+  async exec(prepResult: any): Promise<any> {
+    return prepResult;
   }
   
-  async post(shared: SharedStorage, prep_result: any, exec_result: any): Promise<string | undefined> {
-    shared.final_result = exec_result;
+  async post(shared: SharedStorage, prepResult: any, execResult: any): Promise<string | undefined> {
+    shared.finalResult = execResult;
     return undefined;
   }
 }
@@ -120,24 +119,24 @@ class NoFallbackNode extends Node<SharedStorage> {
     return null;
   }
   
-  async exec(prep_result: null): Promise<string> {
+  async exec(prepResult: null): Promise<string> {
     throw new Error("Test error");
   }
   
-  async post(shared: SharedStorage, prep_result: null, exec_result: string): Promise<string | undefined> {
-    shared.results?.push({ attempts: 1, result: exec_result });
-    return exec_result;
+  async post(shared: SharedStorage, prepResult: null, execResult: string): Promise<string | undefined> {
+    shared.results?.push({ attempts: 1, result: execResult });
+    return execResult;
   }
 }
 
 // New class to demonstrate retry with eventual success
 class EventualSuccessNode extends Node<SharedStorage> {
-  private succeed_after_attempts: number;
-  private attempt_count: number = 0;
+  private succeedAfterAttempts: number;
+  private attemptCount: number = 0;
   
-  constructor(succeed_after_attempts: number = 2, maxRetries: number = 3, wait: number = 0.01) {
+  constructor(succeedAfterAttempts: number = 2, maxRetries: number = 3, wait: number = 0.01) {
     super(maxRetries, wait);
-    this.succeed_after_attempts = succeed_after_attempts;
+    this.succeedAfterAttempts = succeedAfterAttempts;
   }
   
   async prep(shared: SharedStorage): Promise<null> {
@@ -147,18 +146,18 @@ class EventualSuccessNode extends Node<SharedStorage> {
     return null;
   }
   
-  async exec(prep_result: null): Promise<string> {
-    this.attempt_count++;
-    if (this.attempt_count < this.succeed_after_attempts) {
-      throw new Error(`Fail on attempt ${this.attempt_count}`);
+  async exec(prepResult: null): Promise<string> {
+    this.attemptCount++;
+    if (this.attemptCount < this.succeedAfterAttempts) {
+      throw new Error(`Fail on attempt ${this.attemptCount}`);
     }
-    return `success_after_${this.attempt_count}_attempts`;
+    return `success_after_${this.attemptCount}_attempts`;
   }
   
-  async post(shared: SharedStorage, prep_result: null, exec_result: string): Promise<string | undefined> {
+  async post(shared: SharedStorage, prepResult: null, execResult: string): Promise<string | undefined> {
     shared.results?.push({
-      attempts: this.attempt_count,
-      result: exec_result
+      attempts: this.attemptCount,
+      result: execResult
     });
     return undefined;
   }
@@ -166,11 +165,11 @@ class EventualSuccessNode extends Node<SharedStorage> {
 
 // New class to demonstrate customized error handling
 class CustomErrorHandlerNode extends Node<SharedStorage> {
-  private error_type: string;
+  private errorType: string;
   
-  constructor(error_type: string = "standard", maxRetries: number = 1, wait: number = 0) {
+  constructor(errorType: string = "standard", maxRetries: number = 1, wait: number = 0) {
     super(maxRetries, wait);
-    this.error_type = error_type;
+    this.errorType = errorType;
   }
   
   async prep(shared: SharedStorage): Promise<null> {
@@ -180,11 +179,11 @@ class CustomErrorHandlerNode extends Node<SharedStorage> {
     return null;
   }
   
-  async exec(prep_result: null): Promise<string> {
-    throw new Error(this.error_type);
+  async exec(prepResult: null): Promise<string> {
+    throw new Error(this.errorType);
   }
   
-  async execFallback(prep_result: null, error: Error): Promise<string> {
+  async execFallback(prepResult: null, error: Error): Promise<string> {
     // Custom error handling based on error type
     if (error.message === "network") {
       return "network_error_handled";
@@ -195,10 +194,10 @@ class CustomErrorHandlerNode extends Node<SharedStorage> {
     }
   }
   
-  async post(shared: SharedStorage, prep_result: null, exec_result: string): Promise<string | undefined> {
+  async post(shared: SharedStorage, prepResult: null, execResult: string): Promise<string | undefined> {
     shared.results?.push({
       attempts: 1,
-      result: exec_result
+      result: execResult
     });
     return undefined;
   }
@@ -240,7 +239,7 @@ describe('Fallback Functionality Tests with Node', () => {
     
     expect(shared.results?.length).toBe(1);
     expect(shared.results?.[0].result).toBe("fallback");
-    expect(shared.final_result).toEqual([{ attempts: 1, result: 'fallback' }]);
+    expect(shared.finalResult).toEqual([{ attempts: 1, result: 'fallback' }]);
   });
 
   test('no fallback implementation', async () => {

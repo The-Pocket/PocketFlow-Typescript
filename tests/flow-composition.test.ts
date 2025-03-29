@@ -4,7 +4,6 @@ import { Node, Flow } from '../src/index';
 // Define a shared storage type
 type SharedStorage = {
   current?: number;
-  [key: string]: any;
 };
 
 class NumberNode extends Node<SharedStorage> {
