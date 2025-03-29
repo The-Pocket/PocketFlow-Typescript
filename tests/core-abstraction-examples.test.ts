@@ -157,7 +157,7 @@ class LoadFile extends Node<SharedStorage, FileParams> {
   }
 }
 
-class SummarizeAllFiles extends BatchFlow<SharedStorage, FileParams> {
+class SummarizeAllFiles extends BatchFlow<SharedStorage> {
   async prep(shared: SharedStorage): Promise<FileParams[]> {
     return (shared.files || []).map((filename) => ({ filename }));
   }
