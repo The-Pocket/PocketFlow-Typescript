@@ -8,7 +8,6 @@ type SharedStorage = {
     result: string;
   }>;
   final_result?: any;
-  [key: string]: any;
 };
 
 class FallbackNode extends Node<SharedStorage> {

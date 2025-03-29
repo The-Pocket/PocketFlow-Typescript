@@ -6,7 +6,7 @@ type SharedStorage = {
   input_numbers?: number[];
   processed_numbers?: number[];
   execution_order?: number[];
-  [key: string]: any;
+  final_results?: number[];
 };
 
 class AsyncParallelNumberProcessor extends ParallelBatchNode<SharedStorage> {

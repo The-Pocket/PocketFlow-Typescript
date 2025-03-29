@@ -6,7 +6,6 @@ type SharedStorage = {
   input_data?: Record<string, number>;
   results?: Record<string, number>;
   intermediate_results?: Record<string, number>;
-  [key: string]: any;
 };
 
 // Parameters type

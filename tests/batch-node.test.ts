@@ -6,7 +6,9 @@ type SharedStorage = {
   input_array?: number[];
   chunk_results?: number[];
   total?: number;
-  [key: string]: any;
+  result?: string;
+  parallel_results?: number[];
+  completion_order?: number[];
 };
 
 class AsyncArrayChunkNode extends BatchNode<SharedStorage> {

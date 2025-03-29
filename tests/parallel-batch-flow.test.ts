@@ -6,7 +6,6 @@ type SharedStorage = {
   batches?: number[][];
   processed_numbers?: Record<number, number[]>;
   total?: number;
-  [key: string]: any;
 };
 
 class AsyncParallelNumberProcessor extends ParallelBatchNode<
