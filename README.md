@@ -8,7 +8,22 @@
 <img src="https://img.shields.io/discord/1346833819172601907?logo=discord&style=flat">
 </a>
 
+# PocketFlow TypeScript
+
 Pocket Flow is a TypeScript port of the original [Python version](https://github.com/The-Pocket/PocketFlow) - a minimalist LLM framework.
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Documentation](#documentation)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [Community](#community)
+- [License](#license)
+
+## Features
 
 - **Lightweight**: Zero bloat, zero dependencies, zero vendor lock-in.
 
@@ -16,14 +31,106 @@ Pocket Flow is a TypeScript port of the original [Python version](https://github
 
 - **[Agentic Coding](https://zacharyhuang.substack.com/p/agentic-coding-the-most-fun-way-to)**: Let AI Agents (e.g., Cursor AI) build Agents—10x productivity boost!
 
-- To install, `npm install pocketflow` or just copy the [source code](src/index.ts).
+## Installation
 
-- To learn more, check out the [documentation](https://the-pocket.github.io/PocketFlow/). For an in-depth design dive, read the [essay](https://github.com/The-Pocket/.github/blob/main/profile/pocketflow.md).
+```bash
+npm install pocketflow
+```
 
-- 🎉 We now have a [discord](https://discord.gg/hUHHE9Sa6T)!
+Alternatively, you can simply copy the [source code](src/index.ts) directly into your project.
 
+## Quick Start
 
+```typescript
+// Basic example coming soon
+```
 
-To run test: 
-1. `npm install --save-dev jest ts-jest @types/jest typescript`
-2. `npm test`
+## Documentation
+
+- Check out the [official documentation](https://the-pocket.github.io/PocketFlow/) for comprehensive guides and examples. The TypeScript version is still under development, so some features may not be available.
+- For an in-depth design explanation, read our [design essay](https://github.com/The-Pocket/.github/blob/main/profile/pocketflow.md)
+
+## Testing
+
+To run tests locally:
+
+```bash
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+```
+
+## Contributing
+
+We welcome contributions from the community! Here's how you can help:
+
+### Code of Conduct
+
+Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md) to foster an inclusive community.
+
+### How to Contribute
+
+1. **Fork the Repository**
+
+   - Create your own fork of the repo
+
+2. **Create a Branch**
+
+   - Create a feature branch (`git checkout -b feature/amazing-feature`)
+   - For bug fixes, use (`git checkout -b fix/bug-description`)
+
+3. **Make Your Changes**
+
+   - Follow the code style and conventions
+   - Add or update tests as needed
+   - Keep your changes focused and related to a single issue
+
+4. **Test Your Changes**
+
+   - Ensure all tests pass with `npm test`
+   - Add new tests if appropriate
+
+5. **Commit Your Changes**
+
+   - Use clear and descriptive commit messages
+   - Reference issue numbers in commit messages when applicable
+
+6. **Submit a Pull Request**
+   - Provide a clear description of the changes
+   - Link any related issues
+   - Answer any questions or feedback during review
+
+### Development Setup
+
+```bash
+# Clone your forked repository
+git clone https://github.com/yourusername/PocketFlow-Typescript.git
+cd PocketFlow-Typescript
+
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+```
+
+### Reporting Bugs
+
+When reporting bugs, please include:
+
+- A clear, descriptive title
+- Detailed steps to reproduce the issue
+- Expected and actual behavior
+- Environment information (OS, Node.js version, etc.)
+- Any additional context or screenshots
+
+## Community
+
+- Join our [Discord server](https://discord.gg/hUHHE9Sa6T) for discussions and support
+- Follow us on [GitHub](https://github.com/The-Pocket)
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
