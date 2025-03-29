@@ -1,0 +1,17 @@
+{
+  "name": "pocketflow-batch-node",
+  "dependencies": {
+    "pocketflow": ">=1.0.3",
+    "csv-parser": "^3.0.0",
+    "fs-extra": "^11.1.1"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.2",
+    "@types/node": "^18.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "main": "npx ts-node src/main.ts"
+  }
+} 
