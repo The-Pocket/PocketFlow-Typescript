@@ -56,62 +56,53 @@ When an exception occurs in `exec()`, the Node automatically retries until:
 
 You can get the current retry times (0-based) from `this.currentRetry`.
 
-```typescript
-class RetryNode extends Node {
-  exec(prepRes: unknown): unknown {
-    console.log(`Retry ${this.currentRetry} times`);
-    throw new Error("Failed");
-  }
-}
-```
-
 ### Graceful Fallback
 
 To **gracefully handle** the exception (after all retries) rather than raising it, override:
 
 ```typescript
 execFallback(prepRes: unknown, error: Error): unknown {
-    throw error;
+  return "There was an error processing your request.";
 }
 ```
 
-By default, it just re-raises exception. But you can return a fallback result instead, which becomes the `execRes` passed to `post()`.
+By default, it just re-raises the exception.
 
 ### Example: Summarize file
 
 ```typescript
-class SummarizeFile extends Node {
-  prep(shared: unknown): string {
-    return shared["data"];
+type SharedStore = {
+  data: string;
+  summary?: string;
+};
+
+class SummarizeFile extends Node<SharedStore> {
+  prep(shared: SharedStore): string {
+    return shared.data;
   }
 
-  exec(prepRes: string): string {
-    if (!prepRes) {
-      return "Empty file content";
-    }
-    const prompt = `Summarize this text in 10 words: ${prepRes}`;
-    const summary = callLlm(prompt); // might fail
-    return summary;
+  exec(content: string): string {
+    if (!content) return "Empty file content";
+
+    const prompt = `Summarize this text in 10 words: ${content}`;
+    return callLlm(prompt);
   }
 
-  execFallback(prepRes: string, error: Error): string {
-    // Provide a simple fallback instead of crashing
+  execFallback(_: string, error: Error): string {
     return "There was an error processing your request.";
   }
 
-  post(shared: unknown, prepRes: string, execRes: string): Action | undefined {
-    shared["summary"] = execRes;
-    // Return "default" by not returning anything
-    return undefined;
+  post(shared: SharedStore, _: string, summary: string): string | undefined {
+    shared.summary = summary;
+    return undefined; // "default" action
   }
 }
 
-const summarizeNode = new SummarizeFile(3); // maxRetries = 3
+// Example usage
+const node = new SummarizeFile(3); // maxRetries = 3
+const shared: SharedStore = { data: "Long text to summarize..." };
+const action = node.run(shared);
 
-// node.run() calls prep->exec->post
-// If exec() fails, it retries up to 3 times before calling execFallback()
-const actionResult = summarizeNode.run(shared);
-
-console.log("Action returned:", actionResult); // undefined
-console.log("Summary stored:", shared["summary"]);
+console.log("Action:", action);
+console.log("Summary:", shared.summary);
 ```

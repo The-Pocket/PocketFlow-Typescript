@@ -31,7 +31,6 @@ interface SharedState {
 
 // Helper function to simulate LLM call
 async function callLLM(prompt: string): Promise<string> {
-  // In a real implementation, this would call an actual LLM API
   return `Response to: ${prompt}`;
 }
 
@@ -46,13 +45,9 @@ class GenerateOutline extends Node<SharedState> {
     );
   }
 
-  async post(
-    shared: SharedState,
-    prepRes: string,
-    execRes: string
-  ): Promise<string | undefined> {
-    shared.outline = execRes;
-    return "default"; // Return the action for the next node
+  async post(shared: SharedState, _: string, outline: string): Promise<string> {
+    shared.outline = outline;
+    return "default";
   }
 }
 
@@ -65,12 +60,8 @@ class WriteSection extends Node<SharedState> {
     return await callLLM(`Write content based on this outline: ${outline}`);
   }
 
-  async post(
-    shared: SharedState,
-    prepRes: string,
-    execRes: string
-  ): Promise<string | undefined> {
-    shared.draft = execRes;
+  async post(shared: SharedState, _: string, draft: string): Promise<string> {
+    shared.draft = draft;
     return "default";
   }
 }
@@ -86,15 +77,15 @@ class ReviewAndRefine extends Node<SharedState> {
 
   async post(
     shared: SharedState,
-    prepRes: string,
-    execRes: string
-  ): Promise<string | undefined> {
-    shared.final_article = execRes;
-    return undefined; // No next action, end of flow
+    _: string,
+    final: string
+  ): Promise<undefined> {
+    shared.final_article = final;
+    return undefined;
   }
 }
 
-// Connect nodes
+// Connect nodes in sequence
 const outline = new GenerateOutline();
 const write = new WriteSection();
 const review = new ReviewAndRefine();
@@ -103,8 +94,7 @@ outline.next(write).next(review);
 
 // Create and run flow
 const writingFlow = new Flow(outline);
-const shared: SharedState = { topic: "AI Safety" };
-writingFlow.run(shared);
+writingFlow.run({ topic: "AI Safety" });
 ```
 
 For _dynamic cases_, consider using [Agents](./agent.md).

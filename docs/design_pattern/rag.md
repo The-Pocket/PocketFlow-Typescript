@@ -27,16 +27,21 @@ We create three Nodes:
 3. `StoreIndex` – stores embeddings into a [vector database](../utility_function/vector.md).
 
 ```typescript
-class ChunkDocs extends BatchNode {
-  async prep(shared: unknown): Promise<string[]> {
-    // A list of file paths in shared["files"]. We process each file.
-    return shared["files"];
+type SharedStore = {
+  files?: string[];
+  allChunks?: string[];
+  allEmbeds?: number[][];
+  index?: any;
+};
+
+class ChunkDocs extends BatchNode<SharedStore> {
+  async prep(shared: SharedStore): Promise<string[]> {
+    return shared.files || [];
   }
 
   async exec(filepath: string): Promise<string[]> {
-    // read file content. In real usage, do error handling.
     const text = fs.readFileSync(filepath, "utf-8");
-    // chunk by 100 chars each
+    // Simplified chunking for example
     const chunks: string[] = [];
     const size = 100;
     for (let i = 0; i < text.length; i += size) {
@@ -46,24 +51,18 @@ class ChunkDocs extends BatchNode {
   }
 
   async post(
-    shared: unknown,
-    prepRes: string[],
-    execResList: string[][]
-  ): Promise<Action | undefined> {
-    // execResList is a list of chunk-lists, one per file.
-    // flatten them all into a single list of chunks.
-    const allChunks: string[] = [];
-    for (const chunkList of execResList) {
-      allChunks.push(...chunkList);
-    }
-    shared["allChunks"] = allChunks;
+    shared: SharedStore,
+    _: string[],
+    chunks: string[][]
+  ): Promise<undefined> {
+    shared.allChunks = chunks.flat();
     return undefined;
   }
 }
 
-class EmbedDocs extends BatchNode {
-  async prep(shared: unknown): Promise<string[]> {
-    return shared["allChunks"];
+class EmbedDocs extends BatchNode<SharedStore> {
+  async prep(shared: SharedStore): Promise<string[]> {
+    return shared.allChunks || [];
   }
 
   async exec(chunk: string): Promise<number[]> {
@@ -71,57 +70,41 @@ class EmbedDocs extends BatchNode {
   }
 
   async post(
-    shared: unknown,
-    prepRes: string[],
-    execResList: number[][]
-  ): Promise<Action | undefined> {
-    // Store the list of embeddings.
-    shared["allEmbeds"] = execResList;
-    console.log(`Total embeddings: ${execResList.length}`);
+    shared: SharedStore,
+    _: string[],
+    embeddings: number[][]
+  ): Promise<undefined> {
+    shared.allEmbeds = embeddings;
     return undefined;
   }
 }
 
-class StoreIndex extends Node {
-  async prep(shared: unknown): Promise<number[][]> {
-    // We'll read all embeds from shared.
-    return shared["allEmbeds"];
+class StoreIndex extends Node<SharedStore> {
+  async prep(shared: SharedStore): Promise<number[][]> {
+    return shared.allEmbeds || [];
   }
 
   async exec(allEmbeds: number[][]): Promise<unknown> {
-    // Create a vector index (faiss or other DB in real usage).
-    const index = await createIndex(allEmbeds);
-    return index;
+    return await createIndex(allEmbeds);
   }
 
   async post(
-    shared: unknown,
-    prepRes: number[][],
+    shared: SharedStore,
+    _: number[][],
     index: unknown
-  ): Promise<Action | undefined> {
-    shared["index"] = index;
+  ): Promise<undefined> {
+    shared.index = index;
     return undefined;
   }
 }
 
-// Wire them in sequence
+// Create indexing flow
 const chunkNode = new ChunkDocs();
 const embedNode = new EmbedDocs();
 const storeNode = new StoreIndex();
 
-chunkNode.next(embedNode);
-embedNode.next(storeNode);
-
+chunkNode.next(embedNode).next(storeNode);
 const offlineFlow = new Flow(chunkNode);
-```
-
-Usage example:
-
-```typescript
-const shared = {
-  files: ["doc1.txt", "doc2.txt"], // any text files
-};
-await offlineFlow.run(shared);
 ```
 
 ---
@@ -135,9 +118,16 @@ We have 3 nodes:
 3. `GenerateAnswer` – calls the LLM with the question + chunk to produce the final answer.
 
 ```typescript
-class EmbedQuery extends Node {
-  async prep(shared: unknown): Promise<string> {
-    return shared["question"];
+type OnlineStore = SharedStore & {
+  question?: string;
+  qEmb?: number[];
+  retrievedChunk?: string;
+  answer?: string;
+};
+
+class EmbedQuery extends Node<OnlineStore> {
+  async prep(shared: OnlineStore): Promise<string> {
+    return shared.question || "";
   }
 
   async exec(question: string): Promise<number[]> {
@@ -145,78 +135,72 @@ class EmbedQuery extends Node {
   }
 
   async post(
-    shared: unknown,
-    prepRes: string,
+    shared: OnlineStore,
+    _: string,
     qEmb: number[]
-  ): Promise<Action | undefined> {
-    shared["qEmb"] = qEmb;
+  ): Promise<undefined> {
+    shared.qEmb = qEmb;
     return undefined;
   }
 }
 
-class RetrieveDocs extends Node {
-  async prep(shared: unknown): Promise<[number[], unknown, string[]]> {
-    // We'll need the query embedding, plus the offline index/chunks
-    return [shared["qEmb"], shared["index"], shared["allChunks"]];
+class RetrieveDocs extends Node<OnlineStore> {
+  async prep(shared: OnlineStore): Promise<[number[], any, string[]]> {
+    return [shared.qEmb || [], shared.index, shared.allChunks || []];
   }
 
-  async exec(inputs: [number[], unknown, string[]]): Promise<string> {
-    const [qEmb, index, chunks] = inputs;
-    const [I, D] = await searchIndex(index, qEmb, { topK: 1 });
-    const bestId = I[0][0];
-    const relevantChunk = chunks[bestId];
-    return relevantChunk;
+  async exec([qEmb, index, chunks]: [
+    number[],
+    any,
+    string[]
+  ]): Promise<string> {
+    const [ids] = await searchIndex(index, qEmb, { topK: 1 });
+    return chunks[ids[0][0]];
   }
 
   async post(
-    shared: unknown,
-    prepRes: [number[], unknown, string[]],
-    relevantChunk: string
-  ): Promise<Action | undefined> {
-    shared["retrievedChunk"] = relevantChunk;
-    console.log("Retrieved chunk:", relevantChunk.substring(0, 60), "...");
+    shared: OnlineStore,
+    _: [number[], any, string[]],
+    chunk: string
+  ): Promise<undefined> {
+    shared.retrievedChunk = chunk;
     return undefined;
   }
 }
 
-class GenerateAnswer extends Node {
-  async prep(shared: unknown): Promise<[string, string]> {
-    return [shared["question"], shared["retrievedChunk"]];
+class GenerateAnswer extends Node<OnlineStore> {
+  async prep(shared: OnlineStore): Promise<[string, string]> {
+    return [shared.question || "", shared.retrievedChunk || ""];
   }
 
-  async exec(inputs: [string, string]): Promise<string> {
-    const [question, chunk] = inputs;
-    const prompt = `Question: ${question}\nContext: ${chunk}\nAnswer:`;
-    return await callLlm(prompt);
+  async exec([question, chunk]: [string, string]): Promise<string> {
+    return await callLlm(`Question: ${question}\nContext: ${chunk}\nAnswer:`);
   }
 
   async post(
-    shared: unknown,
-    prepRes: [string, string],
+    shared: OnlineStore,
+    _: [string, string],
     answer: string
-  ): Promise<Action | undefined> {
-    shared["answer"] = answer;
-    console.log("Answer:", answer);
+  ): Promise<undefined> {
+    shared.answer = answer;
     return undefined;
   }
 }
 
+// Create query flow
 const embedQNode = new EmbedQuery();
 const retrieveNode = new RetrieveDocs();
 const generateNode = new GenerateAnswer();
 
-embedQNode.next(retrieveNode);
-retrieveNode.next(generateNode);
+embedQNode.next(retrieveNode).next(generateNode);
 const onlineFlow = new Flow(embedQNode);
 ```
 
 Usage example:
 
 ```typescript
-// Suppose we already ran OfflineFlow and have:
-// shared["allChunks"], shared["index"], etc.
-shared["question"] = "Why do people like cats?";
-
-await onlineFlow.run(shared);
-// final answer in shared["answer"]
+const shared = {
+  files: ["doc1.txt", "doc2.txt"], // any text files
+};
+await offlineFlow.run(shared);
 ```
