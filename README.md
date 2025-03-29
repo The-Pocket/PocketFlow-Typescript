@@ -112,6 +112,18 @@ Note: To publish to npm, maintainers need to configure the `NPM_TOKEN` secret in
    - Link any related issues
    - Answer any questions or feedback during review
 
+### Creating a CursorRule
+
+To create a CursorRule to make AI agents work more effectively on the codebase:
+
+1. Visit [gitingest.com](https://gitingest.com/)
+2. Paste the link to the docs folder (e.g., https://github.com/The-Pocket/PocketFlow-Typescript/tree/main/docs) to generate content
+3. Remove the following from the generated result:
+   - All utility function files except for llm
+   - The design_pattern/multi_agent.md file
+   - All \_config.yaml and index.md files, except for docs/index.md
+4. Save the result as a CursorRule to help AI agents understand the codebase structure better
+
 ### Development Setup
 
 ```bash

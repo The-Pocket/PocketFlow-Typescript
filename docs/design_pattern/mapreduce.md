@@ -23,9 +23,6 @@ You first break down the task using [BatchNode](../core_abstraction/batch.md) in
 ### Example: Document Summarization
 
 ```typescript
-import { BatchNode, Node, Flow } from "../src/index";
-
-// Define shared storage type
 type SharedStorage = {
   files?: Record<string, string>;
   file_summaries?: Record<string, string>;
@@ -34,24 +31,20 @@ type SharedStorage = {
 
 class SummarizeAllFiles extends BatchNode<SharedStorage> {
   async prep(shared: SharedStorage): Promise<[string, string][]> {
-    const files = shared.files || {};
-    return Object.entries(files); // [["file1.txt", "aaa..."], ["file2.txt", "bbb..."], ...]
+    return Object.entries(shared.files || {}); // [["file1.txt", "aaa..."], ["file2.txt", "bbb..."], ...]
   }
 
-  async exec(one_file: [string, string]): Promise<[string, string]> {
-    const [filename, file_content] = one_file;
-    const summary_text = await callLLM(
-      `Summarize the following file:\n${file_content}`
-    );
-    return [filename, summary_text];
+  async exec([filename, content]: [string, string]): Promise<[string, string]> {
+    const summary = await callLLM(`Summarize the following file:\n${content}`);
+    return [filename, summary];
   }
 
   async post(
     shared: SharedStorage,
-    prepRes: [string, string][],
-    execRes: [string, string][]
-  ): Promise<string | undefined> {
-    shared.file_summaries = Object.fromEntries(execRes);
+    _: [string, string][],
+    summaries: [string, string][]
+  ): Promise<string> {
+    shared.file_summaries = Object.fromEntries(summaries);
     return "summarized";
   }
 }
@@ -61,60 +54,42 @@ class CombineSummaries extends Node<SharedStorage> {
     return shared.file_summaries || {};
   }
 
-  async exec(file_summaries: Record<string, string>): Promise<string> {
-    // format as: "File1: summary\nFile2: summary...\n"
-    const text_list: string[] = [];
-    for (const [fname, summ] of Object.entries(file_summaries)) {
-      text_list.push(`${fname} summary:\n${summ}\n`);
-    }
-    const big_text = text_list.join("\n---\n");
+  async exec(summaries: Record<string, string>): Promise<string> {
+    const text_list = Object.entries(summaries).map(
+      ([fname, summ]) => `${fname} summary:\n${summ}\n`
+    );
 
     return await callLLM(
-      `Combine these file summaries into one final summary:\n${big_text}`
+      `Combine these file summaries into one final summary:\n${text_list.join(
+        "\n---\n"
+      )}`
     );
   }
 
   async post(
     shared: SharedStorage,
-    prepRes: Record<string, string>,
-    final_summary: string
-  ): Promise<string | undefined> {
-    shared.all_files_summary = final_summary;
+    _: Record<string, string>,
+    finalSummary: string
+  ): Promise<string> {
+    shared.all_files_summary = finalSummary;
     return "combined";
   }
 }
 
-// Helper function to simulate LLM calls
-async function callLLM(prompt: string): Promise<string> {
-  // In a real implementation, this would call an actual LLM
-  return `Summary for: ${prompt.slice(0, 20)}...`;
-}
-
-// Create and connect nodes
+// Create and connect flow
 const batchNode = new SummarizeAllFiles();
 const combineNode = new CombineSummaries();
 batchNode.on("summarized", combineNode);
 
-// Create flow
+// Run the flow with test data
 const flow = new Flow(batchNode);
-
-// Run the flow
-const shared: SharedStorage = {
+flow.run({
   files: {
     "file1.txt":
       "Alice was beginning to get very tired of sitting by her sister...",
     "file2.txt": "Some other interesting text ...",
-    // ...
   },
-};
-
-async function runFlow() {
-  await flow.run(shared);
-  console.log("Individual Summaries:", shared.file_summaries);
-  console.log("\nFinal Summary:\n", shared.all_files_summary);
-}
-
-runFlow();
+});
 ```
 
 > **Performance Tip**: The example above works sequentially. You can speed up the map phase by using `ParallelBatchNode` instead of `BatchNode`. See [(Advanced) Parallel](../core_abstraction/parallel.md) for more details.

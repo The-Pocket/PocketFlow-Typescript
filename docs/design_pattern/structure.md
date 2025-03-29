@@ -39,15 +39,6 @@ summary:
   - Suitable for all skill levels.
 ```
 
-- Generating Configuration Files
-
-```yaml
-server:
-  host: 127.0.0.1
-  port: 8080
-  ssl: true
-```
-
 ## TypeScript Implementation
 
 When using PocketFlow with structured output, follow these TypeScript patterns:
@@ -59,12 +50,11 @@ When using PocketFlow with structured output, follow these TypeScript patterns:
 ### Example Text Summarization
 
 ````typescript
-// Define structured output type
+// Define types
 type SummaryResult = {
   summary: string[];
 };
 
-// Type for shared state
 type SharedStorage = {
   text?: string;
   result?: SummaryResult;
@@ -72,22 +62,18 @@ type SharedStorage = {
 
 class SummarizeNode extends Node<SharedStorage> {
   async prep(shared: SharedStorage): Promise<string | undefined> {
-    // Return the text to summarize from shared state
     return shared.text;
   }
 
-  async exec(prepRes: string | undefined): Promise<SummaryResult> {
-    if (!prepRes) {
-      return { summary: ["No text provided"] };
-    }
+  async exec(text: string | undefined): Promise<SummaryResult> {
+    if (!text) return { summary: ["No text provided"] };
 
-    // Call LLM with prompt for structured output in YAML format
     const prompt = `
 Please summarize the following text as YAML, with exactly 3 bullet points
 
-${prepRes}
+${text}
 
-Now, output:
+Output:
 \`\`\`yaml
 summary:
   - bullet 1
@@ -97,13 +83,12 @@ summary:
 
     // Simulated LLM call
     const response =
-      "```yaml\nsummary:\n  - First important point\n  - Second key insight\n  - Final conclusion\n```";
+      "```yaml\nsummary:\n  - First point\n  - Second insight\n  - Final conclusion\n```";
 
     // Parse YAML response
     const yamlStr = response.split("```yaml")[1].split("```")[0].trim();
 
-    // Convert to TypeScript object
-    // In practice, you might use a library like js-yaml
+    // Extract bullet points
     const result: SummaryResult = {
       summary: yamlStr
         .split("\n")
@@ -111,7 +96,7 @@ summary:
         .map((line) => line.trim().substring(2)),
     };
 
-    // Validate the structure
+    // Validate
     if (!result.summary || !Array.isArray(result.summary)) {
       throw new Error("Invalid summary structure");
     }
@@ -121,26 +106,14 @@ summary:
 
   async post(
     shared: SharedStorage,
-    prepRes: string | undefined,
-    execRes: SummaryResult
+    _: string | undefined,
+    result: SummaryResult
   ): Promise<string | undefined> {
-    // Store the result in shared state
-    shared.result = execRes;
+    shared.result = result;
     return "default";
   }
 }
 ````
-
-### Validation in TypeScript
-
-In TypeScript, you can use several approaches for validation:
-
-1. **Type Checking**: TypeScript's static type system catches many issues at compile time
-2. **Runtime Assertions**: Use conditional checks and throw errors for invalid data
-3. **Schema Validation Libraries**: For more complex scenarios, consider libraries like:
-   - [Zod](https://github.com/colinhacks/zod) - TypeScript-first schema validation
-   - [Yup](https://github.com/jquense/yup) - Schema validation with clear error messages
-   - [io-ts](https://github.com/gcanti/io-ts) - Runtime type system for IO validation
 
 ### Why YAML instead of JSON?
 
@@ -154,9 +127,6 @@ Current LLMs struggle with escaping. YAML is easier with strings since they don'
 }
 ```
 
-- Every double quote inside the string must be escaped with `\"`.
-- Each newline in the dialogue must be represented as `\n`.
-
 **In YAML**
 
 ```yaml
@@ -165,6 +135,3 @@ dialogue: |
   How are you?
   I am good."
 ```
-
-- No need to escape interior quotes—just place the entire text under a block literal (`|`).
-- Newlines are naturally preserved without needing `\n`.
