@@ -148,7 +148,7 @@ class ExecNode extends Node<SharedStorage> {
   }
 }
 
-describe('PocketFlow Tests with Node', () => {
+describe('Pocket Flow Tests with Node', () => {
   test('single number', async () => {
     const shared: SharedStorage = {};
     const start = new NumberNode(5);

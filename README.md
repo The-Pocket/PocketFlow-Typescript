@@ -8,7 +8,7 @@
 <img src="https://img.shields.io/discord/1346833819172601907?logo=discord&style=flat">
 </a>
 
-# PocketFlow TypeScript
+# Pocket Flow TypeScript
 
 Pocket Flow is a TypeScript port of the original [Python version](https://github.com/The-Pocket/PocketFlow) - a minimalist LLM framework.
 

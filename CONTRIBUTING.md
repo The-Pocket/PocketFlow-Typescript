@@ -1,6 +1,6 @@
-# Contributing to PocketFlow TypeScript
+# Contributing to Pocket Flow TypeScript
 
-Thank you for your interest in contributing to PocketFlow! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to Pocket Flow! This document provides guidelines and instructions for contributing to this project.
 
 ## Table of Contents
 
@@ -114,4 +114,4 @@ By participating in this project, you agree to abide by the [Code of Conduct](CO
 - Be respectful and helpful to other community members
 - Share knowledge and help others learn
 
-Thank you for contributing to PocketFlow!
+Thank you for contributing to Pocket Flow!
