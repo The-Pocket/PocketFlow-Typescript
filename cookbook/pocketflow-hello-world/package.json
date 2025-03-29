@@ -1,6 +1,6 @@
 {
     "name": "hello-pocketflow",
     "dependencies": {
-      "pocketflow": ">=1.0.0"
+      "pocketflow": ">=1.0.3"
     }
 }

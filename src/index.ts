@@ -2,12 +2,12 @@ type NonIterableObject = Partial<Record<string, unknown>> & { [Symbol.iterator]?
 class BaseNode<S = unknown, P extends NonIterableObject = NonIterableObject> {
   protected _params: P = {} as P; protected _successors: Map<Action, BaseNode> = new Map();
   protected async _exec(prepRes: unknown): Promise<unknown> { return await this.exec(prepRes); }
-  protected async _run(shared: S): Promise<Action | undefined> {
-    const p = await this.prep(shared), e = await this._exec(p); return await this.post(shared, p, e);
-  }
   async prep(shared: S): Promise<unknown> { return undefined; }
   async exec(prepRes: unknown): Promise<unknown> { return undefined; }
   async post(shared: S, prepRes: unknown, execRes: unknown): Promise<Action | undefined> { return undefined; }
+  async _run(shared: S): Promise<Action | undefined> {
+    const p = await this.prep(shared), e = await this._exec(p); return await this.post(shared, p, e);
+  }
   async run(shared: S): Promise<Action | undefined> {
     if (this._successors.size > 0) console.warn("Node won't run successors. Use Flow.");
     return await this._run(shared);
@@ -66,7 +66,7 @@ class Flow<S = unknown, P extends NonIterableObject = NonIterableObject> extends
     let current: BaseNode | undefined = this.start.clone();
     const p = params || this._params;
     while (current) {
-      current.setParams(p); const action = await current.run(shared);
+      current.setParams(p); const action = await current._run(shared);
       current = current.getNextNode(action); current = current?.clone();
     }
   }
