@@ -415,7 +415,6 @@ A **BatchNode** extends `Node` but changes `prep()` and `exec()`:
 ### Example: Summarize a Large File
 
 ```typescript
-// Define shared storage type
 type SharedStorage = {
   data: string;
   summary?: string;
@@ -423,7 +422,7 @@ type SharedStorage = {
 
 class MapSummaries extends BatchNode<SharedStorage> {
   async prep(shared: SharedStorage): Promise<string[]> {
-    // Suppose we have a big file; chunk it
+    // Chunk content into manageable pieces
     const content = shared.data;
     const chunks: string[] = [];
     const chunkSize = 10000;
@@ -436,27 +435,22 @@ class MapSummaries extends BatchNode<SharedStorage> {
   }
 
   async exec(chunk: string): Promise<string> {
-    // Process each chunk with LLM
     const prompt = `Summarize this chunk in 10 words: ${chunk}`;
-    const summary = await callLlm(prompt);
-    return summary;
+    return await callLlm(prompt);
   }
 
   async post(
     shared: SharedStorage,
-    prepRes: string[],
-    execRes: string[]
-  ): Promise<string | undefined> {
-    // Combine summaries
-    const combined = execRes.join("\n");
-    shared.summary = combined;
+    _: string[],
+    summaries: string[]
+  ): Promise<string> {
+    shared.summary = summaries.join("\n");
     return "default";
   }
 }
 
 // Usage
-const mapSummaries = new MapSummaries();
-const flow = new Flow(mapSummaries);
+const flow = new Flow(new MapSummaries());
 await flow.run({ data: "very long text content..." });
 ```
 
@@ -469,7 +463,6 @@ A **BatchFlow** runs a **Flow** multiple times, each time with different `params
 ### Example: Summarize Many Files
 
 ```typescript
-// Define shared storage and parameter types
 type SharedStorage = {
   files: string[];
 };
@@ -484,39 +477,28 @@ class SummarizeAllFiles extends BatchFlow<SharedStorage> {
   }
 }
 
-// Suppose we have a per-file Flow (e.g., load_file >> summarize >> reduce):
-const summarizeFile = new SummarizeFile(loadFile);
-
-// Wrap that flow into a BatchFlow:
+// Create a per-file summarization flow
+const summarizeFile = new SummarizeFile();
 const summarizeAllFiles = new SummarizeAllFiles(summarizeFile);
-await summarizeAllFiles.run(shared);
+
+await summarizeAllFiles.run({ files: ["file1.txt", "file2.txt"] });
 ```
 
 ### Under the Hood
 
-1. `prep(shared)` returns a list of param dicts—e.g., `[{filename: "file1.txt"}, {filename: "file2.txt"}, ...]`.
-2. The **BatchFlow** loops through each dict. For each one:
-   - It merges the dict with the BatchFlow's own `params`.
-   - It calls `flow.run(shared)` using the merged result.
-3. This means the sub-Flow is run **repeatedly**, once for every param dict.
+1. `prep(shared)` returns a list of param objects—e.g., `[{filename: "file1.txt"}, {filename: "file2.txt"}, ...]`.
+2. The **BatchFlow** loops through each object and:
+   - Merges it with the BatchFlow's own `params`
+   - Calls `flow.run(shared)` using the merged result
+3. This means the sub-Flow runs **repeatedly**, once for every param object.
 
 ---
 
-## 3. Nested or Multi-Level Batches
+## 3. Nested Batches
 
-You can nest a **BatchFlow** in another **BatchFlow**. For instance:
-
-- **Outer** batch: returns a list of directory param dicts (e.g., `{"directory": "/pathA"}`, `{"directory": "/pathB"}`, ...).
-- **Inner** batch: returning a list of per-file param dicts.
-
-At each level, **BatchFlow** merges its own param dict with the parent's. By the time you reach the **innermost** node, the final `params` is the merged result of **all** parents in the chain. This way, a nested structure can keep track of the entire context (e.g., directory + file name) at once.
+You can nest BatchFlows to handle hierarchical data processing:
 
 ```typescript
-// Define shared storage and parameter types
-type SharedStorage = {
-  [key: string]: any;
-};
-
 type DirectoryParams = {
   directory: string;
 };
@@ -528,32 +510,30 @@ type FileParams = DirectoryParams & {
 class FileBatchFlow extends BatchFlow<SharedStorage> {
   async prep(shared: SharedStorage): Promise<FileParams[]> {
     const directory = this._params.directory;
-    // Get files from the directory
     const files = await getFilesInDirectory(directory).filter((f) =>
       f.endsWith(".txt")
     );
 
     return files.map((filename) => ({
-      directory, // Pass on the directory from parent
-      filename, // Add the filename for this batch item
+      directory, // Pass on directory from parent
+      filename, // Add filename for this batch item
     }));
   }
 }
 
 class DirectoryBatchFlow extends BatchFlow<SharedStorage> {
   async prep(shared: SharedStorage): Promise<DirectoryParams[]> {
-    const directories = ["/path/to/dirA", "/path/to/dirB"];
-    return directories.map((directory) => ({
+    return ["/path/to/dirA", "/path/to/dirB"].map((directory) => ({
       directory,
     }));
   }
 }
 
-// MapSummaries will have params like {"directory": "/path/to/dirA", "filename": "file1.txt"}
-const mapSummaries = new MapSummaries();
-const innerFlow = new FileBatchFlow(mapSummaries);
-const outerFlow = new DirectoryBatchFlow(innerFlow);
-await outerFlow.run({});
+// Process all files in all directories
+const processingNode = new ProcessingNode();
+const fileFlow = new FileBatchFlow(processingNode);
+const dirFlow = new DirectoryBatchFlow(fileFlow);
+await dirFlow.run({});
 ```
 
 ================================================
@@ -1026,64 +1006,55 @@ When an exception occurs in `exec()`, the Node automatically retries until:
 
 You can get the current retry times (0-based) from `this.currentRetry`.
 
-```typescript
-class RetryNode extends Node {
-  exec(prepRes: unknown): unknown {
-    console.log(`Retry ${this.currentRetry} times`);
-    throw new Error("Failed");
-  }
-}
-```
-
 ### Graceful Fallback
 
 To **gracefully handle** the exception (after all retries) rather than raising it, override:
 
 ```typescript
 execFallback(prepRes: unknown, error: Error): unknown {
-    throw error;
+  return "There was an error processing your request.";
 }
 ```
 
-By default, it just re-raises exception. But you can return a fallback result instead, which becomes the `execRes` passed to `post()`.
+By default, it just re-raises the exception.
 
 ### Example: Summarize file
 
 ```typescript
-class SummarizeFile extends Node {
-  prep(shared: unknown): string {
-    return shared["data"];
+type SharedStore = {
+  data: string;
+  summary?: string;
+};
+
+class SummarizeFile extends Node<SharedStore> {
+  prep(shared: SharedStore): string {
+    return shared.data;
   }
 
-  exec(prepRes: string): string {
-    if (!prepRes) {
-      return "Empty file content";
-    }
-    const prompt = `Summarize this text in 10 words: ${prepRes}`;
-    const summary = callLlm(prompt); // might fail
-    return summary;
+  exec(content: string): string {
+    if (!content) return "Empty file content";
+
+    const prompt = `Summarize this text in 10 words: ${content}`;
+    return callLlm(prompt);
   }
 
-  execFallback(prepRes: string, error: Error): string {
-    // Provide a simple fallback instead of crashing
+  execFallback(_: string, error: Error): string {
     return "There was an error processing your request.";
   }
 
-  post(shared: unknown, prepRes: string, execRes: string): Action | undefined {
-    shared["summary"] = execRes;
-    // Return "default" by not returning anything
-    return undefined;
+  post(shared: SharedStore, _: string, summary: string): string | undefined {
+    shared.summary = summary;
+    return undefined; // "default" action
   }
 }
 
-const summarizeNode = new SummarizeFile(3); // maxRetries = 3
+// Example usage
+const node = new SummarizeFile(3); // maxRetries = 3
+const shared: SharedStore = { data: "Long text to summarize..." };
+const action = node.run(shared);
 
-// node.run() calls prep->exec->post
-// If exec() fails, it retries up to 3 times before calling execFallback()
-const actionResult = summarizeNode.run(shared);
-
-console.log("Action returned:", actionResult); // undefined
-console.log("Summary stored:", shared["summary"]);
+console.log("Action:", action);
+console.log("Summary:", shared.summary);
 ```
 
 ================================================
@@ -1189,49 +1160,42 @@ Agent is a powerful design pattern in which nodes can take dynamic actions based
 ```typescript
 `
 ### CONTEXT
-Task: ${taskDescription}
-Previous Actions: ${previousActions}
-Current State: ${currentState}
+Task: ${task}
+Previous Actions: ${prevActions}
+Current State: ${state}
 
 ### ACTION SPACE
 [1] search
   Description: Use web search to get results
-  Parameters:
-    - query (str): What to search for
+  Parameters: query (str)
 
 [2] answer
   Description: Conclude based on the results
-  Parameters:
-    - result (str): Final answer to provide
+  Parameters: result (str)
 
 ### NEXT ACTION
-Decide the next action based on the current context and available action space.
-Return your response in the following format:
+Decide the next action based on the current context.
+Return your response in YAML format:
 
 \`\`\`yaml
-thinking: |
-    <your step-by-step reasoning process>
+thinking: <reasoning process>
 action: <action_name>
-parameters:
-    <parameter_name>: <parameter_value>
+parameters: <parameters>
 \`\`\``;
 ```
 
 The core of building **high-performance** and **reliable** agents boils down to:
 
-1. **Context Management:** Provide _relevant, minimal context._ For example, rather than including an entire chat history, retrieve the most relevant via [RAG](./rag.md). Even with larger context windows, LLMs still fall victim to ["lost in the middle"](https://arxiv.org/abs/2307.03172), overlooking mid-prompt content.
+1. **Context Management:** Provide _relevant, minimal context._ For example, rather than including an entire chat history, retrieve the most relevant via [RAG](./rag.md).
 
-2. **Action Space:** Provide _a well-structured and unambiguous_ set of actions—avoiding overlap like separate `read_databases` or `read_csvs`. Instead, import CSVs into the database.
+2. **Action Space:** Provide _a well-structured and unambiguous_ set of actions—avoiding overlap like separate `read_databases` or `read_csvs`.
 
 ## Example Good Action Design
 
-- **Incremental:** Feed content in manageable chunks (500 lines or 1 page) instead of all at once.
-
-- **Overview-zoom-in:** First provide high-level structure (table of contents, summary), then allow drilling into details (raw texts).
-
-- **Parameterized/Programmable:** Instead of fixed actions, enable parameterized (columns to select) or programmable (SQL queries) actions, for example, to read CSV files.
-
-- **Backtracking:** Let the agent undo the last step instead of restarting entirely, preserving progress when encountering errors or dead ends.
+- **Incremental:** Feed content in manageable chunks instead of all at once.
+- **Overview-zoom-in:** First provide high-level structure, then allow drilling into details.
+- **Parameterized/Programmable:** Enable parameterized or programmable actions.
+- **Backtracking:** Let the agent undo the last step instead of restarting entirely.
 
 ## Example: Search Agent
 
@@ -1242,12 +1206,6 @@ This agent:
 3. Answers when enough context gathered
 
 ````typescript
-interface AgentAction {
-  action: string;
-  reason: string;
-  search_term?: string;
-}
-
 interface SharedState {
   query?: string;
   context?: Array<{ term: string; result: string }>;
@@ -1260,12 +1218,10 @@ class DecideAction extends Node<SharedState> {
     const context = shared.context
       ? JSON.stringify(shared.context)
       : "No previous search";
-    const query = shared.query || "";
-    return [query, context];
+    return [shared.query || "", context];
   }
 
-  async exec(inputs: [string, string]): Promise<AgentAction> {
-    const [query, context] = inputs;
+  async exec([query, context]: [string, string]): Promise<any> {
     const prompt = `
 Given input: ${query}
 Previous search results: ${context}
@@ -1278,37 +1234,18 @@ search_term: search phrase if action is search
 \`\`\``;
     const resp = await callLlm(prompt);
     const yamlStr = resp.split("```yaml")[1].split("```")[0].trim();
-    const result = yaml.load(yamlStr) as AgentAction;
-
-    // Validations
-    if (!result || typeof result !== "object") {
-      throw new Error("Invalid result format");
-    }
-    if (!("action" in result)) {
-      throw new Error("Missing action in result");
-    }
-    if (!("reason" in result)) {
-      throw new Error("Missing reason in result");
-    }
-    if (result.action !== "search" && result.action !== "answer") {
-      throw new Error(`Invalid action: ${result.action}`);
-    }
-    if (result.action === "search" && !("search_term" in result)) {
-      throw new Error("Missing search_term for search action");
-    }
-
-    return result;
+    return yaml.load(yamlStr);
   }
 
   async post(
     shared: SharedState,
-    prepRes: [string, string],
-    execRes: AgentAction
+    _: [string, string],
+    result: any
   ): Promise<string> {
-    if (execRes.action === "search") {
-      shared.search_term = execRes.search_term;
+    if (result.action === "search") {
+      shared.search_term = result.search_term;
     }
-    return execRes.action;
+    return result.action;
   }
 }
 
@@ -1321,14 +1258,9 @@ class SearchWeb extends Node<SharedState> {
     return await searchWeb(searchTerm);
   }
 
-  async post(
-    shared: SharedState,
-    prepRes: string,
-    execRes: string
-  ): Promise<string> {
-    const prevSearches = shared.context || [];
+  async post(shared: SharedState, _: string, execRes: string): Promise<string> {
     shared.context = [
-      ...prevSearches,
+      ...(shared.context || []),
       { term: shared.search_term || "", result: execRes },
     ];
     return "decide";
@@ -1337,21 +1269,21 @@ class SearchWeb extends Node<SharedState> {
 
 class DirectAnswer extends Node<SharedState> {
   async prep(shared: SharedState): Promise<[string, string]> {
-    const contextStr = shared.context ? JSON.stringify(shared.context) : "";
-    return [shared.query || "", contextStr];
+    return [
+      shared.query || "",
+      shared.context ? JSON.stringify(shared.context) : "",
+    ];
   }
 
-  async exec(inputs: [string, string]): Promise<string> {
-    const [query, context] = inputs;
+  async exec([query, context]: [string, string]): Promise<string> {
     return await callLlm(`Context: ${context}\nAnswer: ${query}`);
   }
 
   async post(
     shared: SharedState,
-    prepRes: [string, string],
+    _: [string, string],
     execRes: string
   ): Promise<undefined> {
-    console.log(`Answer: ${execRes}`);
     shared.answer = execRes;
     return undefined;
   }
@@ -1401,9 +1333,6 @@ You first break down the task using [BatchNode](../core_abstraction/batch.md) in
 ### Example: Document Summarization
 
 ```typescript
-import { BatchNode, Node, Flow } from "../src/index";
-
-// Define shared storage type
 type SharedStorage = {
   files?: Record<string, string>;
   file_summaries?: Record<string, string>;
@@ -1412,24 +1341,20 @@ type SharedStorage = {
 
 class SummarizeAllFiles extends BatchNode<SharedStorage> {
   async prep(shared: SharedStorage): Promise<[string, string][]> {
-    const files = shared.files || {};
-    return Object.entries(files); // [["file1.txt", "aaa..."], ["file2.txt", "bbb..."], ...]
+    return Object.entries(shared.files || {}); // [["file1.txt", "aaa..."], ["file2.txt", "bbb..."], ...]
   }
 
-  async exec(one_file: [string, string]): Promise<[string, string]> {
-    const [filename, file_content] = one_file;
-    const summary_text = await callLLM(
-      `Summarize the following file:\n${file_content}`
-    );
-    return [filename, summary_text];
+  async exec([filename, content]: [string, string]): Promise<[string, string]> {
+    const summary = await callLLM(`Summarize the following file:\n${content}`);
+    return [filename, summary];
   }
 
   async post(
     shared: SharedStorage,
-    prepRes: [string, string][],
-    execRes: [string, string][]
-  ): Promise<string | undefined> {
-    shared.file_summaries = Object.fromEntries(execRes);
+    _: [string, string][],
+    summaries: [string, string][]
+  ): Promise<string> {
+    shared.file_summaries = Object.fromEntries(summaries);
     return "summarized";
   }
 }
@@ -1439,60 +1364,42 @@ class CombineSummaries extends Node<SharedStorage> {
     return shared.file_summaries || {};
   }
 
-  async exec(file_summaries: Record<string, string>): Promise<string> {
-    // format as: "File1: summary\nFile2: summary...\n"
-    const text_list: string[] = [];
-    for (const [fname, summ] of Object.entries(file_summaries)) {
-      text_list.push(`${fname} summary:\n${summ}\n`);
-    }
-    const big_text = text_list.join("\n---\n");
+  async exec(summaries: Record<string, string>): Promise<string> {
+    const text_list = Object.entries(summaries).map(
+      ([fname, summ]) => `${fname} summary:\n${summ}\n`
+    );
 
     return await callLLM(
-      `Combine these file summaries into one final summary:\n${big_text}`
+      `Combine these file summaries into one final summary:\n${text_list.join(
+        "\n---\n"
+      )}`
     );
   }
 
   async post(
     shared: SharedStorage,
-    prepRes: Record<string, string>,
-    final_summary: string
-  ): Promise<string | undefined> {
-    shared.all_files_summary = final_summary;
+    _: Record<string, string>,
+    finalSummary: string
+  ): Promise<string> {
+    shared.all_files_summary = finalSummary;
     return "combined";
   }
 }
 
-// Helper function to simulate LLM calls
-async function callLLM(prompt: string): Promise<string> {
-  // In a real implementation, this would call an actual LLM
-  return `Summary for: ${prompt.slice(0, 20)}...`;
-}
-
-// Create and connect nodes
+// Create and connect flow
 const batchNode = new SummarizeAllFiles();
 const combineNode = new CombineSummaries();
 batchNode.on("summarized", combineNode);
 
-// Create flow
+// Run the flow with test data
 const flow = new Flow(batchNode);
-
-// Run the flow
-const shared: SharedStorage = {
+flow.run({
   files: {
     "file1.txt":
       "Alice was beginning to get very tired of sitting by her sister...",
     "file2.txt": "Some other interesting text ...",
-    // ...
   },
-};
-
-async function runFlow() {
-  await flow.run(shared);
-  console.log("Individual Summaries:", shared.file_summaries);
-  console.log("\nFinal Summary:\n", shared.all_files_summary);
-}
-
-runFlow();
+});
 ```
 
 > **Performance Tip**: The example above works sequentially. You can speed up the map phase by using `ParallelBatchNode` instead of `BatchNode`. See [(Advanced) Parallel](../core_abstraction/parallel.md) for more details.
@@ -1533,16 +1440,21 @@ We create three Nodes:
 3. `StoreIndex` – stores embeddings into a [vector database](../utility_function/vector.md).
 
 ```typescript
-class ChunkDocs extends BatchNode {
-  async prep(shared: unknown): Promise<string[]> {
-    // A list of file paths in shared["files"]. We process each file.
-    return shared["files"];
+type SharedStore = {
+  files?: string[];
+  allChunks?: string[];
+  allEmbeds?: number[][];
+  index?: any;
+};
+
+class ChunkDocs extends BatchNode<SharedStore> {
+  async prep(shared: SharedStore): Promise<string[]> {
+    return shared.files || [];
   }
 
   async exec(filepath: string): Promise<string[]> {
-    // read file content. In real usage, do error handling.
     const text = fs.readFileSync(filepath, "utf-8");
-    // chunk by 100 chars each
+    // Simplified chunking for example
     const chunks: string[] = [];
     const size = 100;
     for (let i = 0; i < text.length; i += size) {
@@ -1552,24 +1464,18 @@ class ChunkDocs extends BatchNode {
   }
 
   async post(
-    shared: unknown,
-    prepRes: string[],
-    execResList: string[][]
-  ): Promise<Action | undefined> {
-    // execResList is a list of chunk-lists, one per file.
-    // flatten them all into a single list of chunks.
-    const allChunks: string[] = [];
-    for (const chunkList of execResList) {
-      allChunks.push(...chunkList);
-    }
-    shared["allChunks"] = allChunks;
+    shared: SharedStore,
+    _: string[],
+    chunks: string[][]
+  ): Promise<undefined> {
+    shared.allChunks = chunks.flat();
     return undefined;
   }
 }
 
-class EmbedDocs extends BatchNode {
-  async prep(shared: unknown): Promise<string[]> {
-    return shared["allChunks"];
+class EmbedDocs extends BatchNode<SharedStore> {
+  async prep(shared: SharedStore): Promise<string[]> {
+    return shared.allChunks || [];
   }
 
   async exec(chunk: string): Promise<number[]> {
@@ -1577,57 +1483,41 @@ class EmbedDocs extends BatchNode {
   }
 
   async post(
-    shared: unknown,
-    prepRes: string[],
-    execResList: number[][]
-  ): Promise<Action | undefined> {
-    // Store the list of embeddings.
-    shared["allEmbeds"] = execResList;
-    console.log(`Total embeddings: ${execResList.length}`);
+    shared: SharedStore,
+    _: string[],
+    embeddings: number[][]
+  ): Promise<undefined> {
+    shared.allEmbeds = embeddings;
     return undefined;
   }
 }
 
-class StoreIndex extends Node {
-  async prep(shared: unknown): Promise<number[][]> {
-    // We'll read all embeds from shared.
-    return shared["allEmbeds"];
+class StoreIndex extends Node<SharedStore> {
+  async prep(shared: SharedStore): Promise<number[][]> {
+    return shared.allEmbeds || [];
   }
 
   async exec(allEmbeds: number[][]): Promise<unknown> {
-    // Create a vector index (faiss or other DB in real usage).
-    const index = await createIndex(allEmbeds);
-    return index;
+    return await createIndex(allEmbeds);
   }
 
   async post(
-    shared: unknown,
-    prepRes: number[][],
+    shared: SharedStore,
+    _: number[][],
     index: unknown
-  ): Promise<Action | undefined> {
-    shared["index"] = index;
+  ): Promise<undefined> {
+    shared.index = index;
     return undefined;
   }
 }
 
-// Wire them in sequence
+// Create indexing flow
 const chunkNode = new ChunkDocs();
 const embedNode = new EmbedDocs();
 const storeNode = new StoreIndex();
 
-chunkNode.next(embedNode);
-embedNode.next(storeNode);
-
+chunkNode.next(embedNode).next(storeNode);
 const offlineFlow = new Flow(chunkNode);
-```
-
-Usage example:
-
-```typescript
-const shared = {
-  files: ["doc1.txt", "doc2.txt"], // any text files
-};
-await offlineFlow.run(shared);
 ```
 
 ---
@@ -1641,9 +1531,16 @@ We have 3 nodes:
 3. `GenerateAnswer` – calls the LLM with the question + chunk to produce the final answer.
 
 ```typescript
-class EmbedQuery extends Node {
-  async prep(shared: unknown): Promise<string> {
-    return shared["question"];
+type OnlineStore = SharedStore & {
+  question?: string;
+  qEmb?: number[];
+  retrievedChunk?: string;
+  answer?: string;
+};
+
+class EmbedQuery extends Node<OnlineStore> {
+  async prep(shared: OnlineStore): Promise<string> {
+    return shared.question || "";
   }
 
   async exec(question: string): Promise<number[]> {
@@ -1651,80 +1548,74 @@ class EmbedQuery extends Node {
   }
 
   async post(
-    shared: unknown,
-    prepRes: string,
+    shared: OnlineStore,
+    _: string,
     qEmb: number[]
-  ): Promise<Action | undefined> {
-    shared["qEmb"] = qEmb;
+  ): Promise<undefined> {
+    shared.qEmb = qEmb;
     return undefined;
   }
 }
 
-class RetrieveDocs extends Node {
-  async prep(shared: unknown): Promise<[number[], unknown, string[]]> {
-    // We'll need the query embedding, plus the offline index/chunks
-    return [shared["qEmb"], shared["index"], shared["allChunks"]];
+class RetrieveDocs extends Node<OnlineStore> {
+  async prep(shared: OnlineStore): Promise<[number[], any, string[]]> {
+    return [shared.qEmb || [], shared.index, shared.allChunks || []];
   }
 
-  async exec(inputs: [number[], unknown, string[]]): Promise<string> {
-    const [qEmb, index, chunks] = inputs;
-    const [I, D] = await searchIndex(index, qEmb, { topK: 1 });
-    const bestId = I[0][0];
-    const relevantChunk = chunks[bestId];
-    return relevantChunk;
+  async exec([qEmb, index, chunks]: [
+    number[],
+    any,
+    string[]
+  ]): Promise<string> {
+    const [ids] = await searchIndex(index, qEmb, { topK: 1 });
+    return chunks[ids[0][0]];
   }
 
   async post(
-    shared: unknown,
-    prepRes: [number[], unknown, string[]],
-    relevantChunk: string
-  ): Promise<Action | undefined> {
-    shared["retrievedChunk"] = relevantChunk;
-    console.log("Retrieved chunk:", relevantChunk.substring(0, 60), "...");
+    shared: OnlineStore,
+    _: [number[], any, string[]],
+    chunk: string
+  ): Promise<undefined> {
+    shared.retrievedChunk = chunk;
     return undefined;
   }
 }
 
-class GenerateAnswer extends Node {
-  async prep(shared: unknown): Promise<[string, string]> {
-    return [shared["question"], shared["retrievedChunk"]];
+class GenerateAnswer extends Node<OnlineStore> {
+  async prep(shared: OnlineStore): Promise<[string, string]> {
+    return [shared.question || "", shared.retrievedChunk || ""];
   }
 
-  async exec(inputs: [string, string]): Promise<string> {
-    const [question, chunk] = inputs;
-    const prompt = `Question: ${question}\nContext: ${chunk}\nAnswer:`;
-    return await callLlm(prompt);
+  async exec([question, chunk]: [string, string]): Promise<string> {
+    return await callLlm(`Question: ${question}\nContext: ${chunk}\nAnswer:`);
   }
 
   async post(
-    shared: unknown,
-    prepRes: [string, string],
+    shared: OnlineStore,
+    _: [string, string],
     answer: string
-  ): Promise<Action | undefined> {
-    shared["answer"] = answer;
-    console.log("Answer:", answer);
+  ): Promise<undefined> {
+    shared.answer = answer;
     return undefined;
   }
 }
 
+// Create query flow
 const embedQNode = new EmbedQuery();
 const retrieveNode = new RetrieveDocs();
 const generateNode = new GenerateAnswer();
 
-embedQNode.next(retrieveNode);
-retrieveNode.next(generateNode);
+embedQNode.next(retrieveNode).next(generateNode);
 const onlineFlow = new Flow(embedQNode);
 ```
 
 Usage example:
 
 ```typescript
-// Suppose we already ran OfflineFlow and have:
-// shared["allChunks"], shared["index"], etc.
-shared["question"] = "Why do people like cats?";
-
-await onlineFlow.run(shared);
-// final answer in shared["answer"]
+const shared = {
+  files: ["doc1.txt", "doc2.txt"], // any text files
+};
+await offlineFlow.run(shared);
 ```
 
 ================================================
@@ -1774,15 +1665,6 @@ summary:
   - Suitable for all skill levels.
 ```
 
-- Generating Configuration Files
-
-```yaml
-server:
-  host: 127.0.0.1
-  port: 8080
-  ssl: true
-```
-
 ## TypeScript Implementation
 
 When using PocketFlow with structured output, follow these TypeScript patterns:
@@ -1794,12 +1676,11 @@ When using PocketFlow with structured output, follow these TypeScript patterns:
 ### Example Text Summarization
 
 ````typescript
-// Define structured output type
+// Define types
 type SummaryResult = {
   summary: string[];
 };
 
-// Type for shared state
 type SharedStorage = {
   text?: string;
   result?: SummaryResult;
@@ -1807,22 +1688,18 @@ type SharedStorage = {
 
 class SummarizeNode extends Node<SharedStorage> {
   async prep(shared: SharedStorage): Promise<string | undefined> {
-    // Return the text to summarize from shared state
     return shared.text;
   }
 
-  async exec(prepRes: string | undefined): Promise<SummaryResult> {
-    if (!prepRes) {
-      return { summary: ["No text provided"] };
-    }
+  async exec(text: string | undefined): Promise<SummaryResult> {
+    if (!text) return { summary: ["No text provided"] };
 
-    // Call LLM with prompt for structured output in YAML format
     const prompt = `
 Please summarize the following text as YAML, with exactly 3 bullet points
 
-${prepRes}
+${text}
 
-Now, output:
+Output:
 \`\`\`yaml
 summary:
   - bullet 1
@@ -1832,13 +1709,12 @@ summary:
 
     // Simulated LLM call
     const response =
-      "```yaml\nsummary:\n  - First important point\n  - Second key insight\n  - Final conclusion\n```";
+      "```yaml\nsummary:\n  - First point\n  - Second insight\n  - Final conclusion\n```";
 
     // Parse YAML response
     const yamlStr = response.split("```yaml")[1].split("```")[0].trim();
 
-    // Convert to TypeScript object
-    // In practice, you might use a library like js-yaml
+    // Extract bullet points
     const result: SummaryResult = {
       summary: yamlStr
         .split("\n")
@@ -1846,7 +1722,7 @@ summary:
         .map((line) => line.trim().substring(2)),
     };
 
-    // Validate the structure
+    // Validate
     if (!result.summary || !Array.isArray(result.summary)) {
       throw new Error("Invalid summary structure");
     }
@@ -1856,26 +1732,14 @@ summary:
 
   async post(
     shared: SharedStorage,
-    prepRes: string | undefined,
-    execRes: SummaryResult
+    _: string | undefined,
+    result: SummaryResult
   ): Promise<string | undefined> {
-    // Store the result in shared state
-    shared.result = execRes;
+    shared.result = result;
     return "default";
   }
 }
 ````
-
-### Validation in TypeScript
-
-In TypeScript, you can use several approaches for validation:
-
-1. **Type Checking**: TypeScript's static type system catches many issues at compile time
-2. **Runtime Assertions**: Use conditional checks and throw errors for invalid data
-3. **Schema Validation Libraries**: For more complex scenarios, consider libraries like:
-   - [Zod](https://github.com/colinhacks/zod) - TypeScript-first schema validation
-   - [Yup](https://github.com/jquense/yup) - Schema validation with clear error messages
-   - [io-ts](https://github.com/gcanti/io-ts) - Runtime type system for IO validation
 
 ### Why YAML instead of JSON?
 
@@ -1889,9 +1753,6 @@ Current LLMs struggle with escaping. YAML is easier with strings since they don'
 }
 ```
 
-- Every double quote inside the string must be escaped with `\"`.
-- Each newline in the dialogue must be represented as `\n`.
-
 **In YAML**
 
 ```yaml
@@ -1900,9 +1761,6 @@ dialogue: |
   How are you?
   I am good."
 ```
-
-- No need to escape interior quotes—just place the entire text under a block literal (`|`).
-- Newlines are naturally preserved without needing `\n`.
 
 ================================================
 File: docs/design_pattern/workflow.md
@@ -1943,7 +1801,6 @@ interface SharedState {
 
 // Helper function to simulate LLM call
 async function callLLM(prompt: string): Promise<string> {
-  // In a real implementation, this would call an actual LLM API
   return `Response to: ${prompt}`;
 }
 
@@ -1958,13 +1815,9 @@ class GenerateOutline extends Node<SharedState> {
     );
   }
 
-  async post(
-    shared: SharedState,
-    prepRes: string,
-    execRes: string
-  ): Promise<string | undefined> {
-    shared.outline = execRes;
-    return "default"; // Return the action for the next node
+  async post(shared: SharedState, _: string, outline: string): Promise<string> {
+    shared.outline = outline;
+    return "default";
   }
 }
 
@@ -1977,12 +1830,8 @@ class WriteSection extends Node<SharedState> {
     return await callLLM(`Write content based on this outline: ${outline}`);
   }
 
-  async post(
-    shared: SharedState,
-    prepRes: string,
-    execRes: string
-  ): Promise<string | undefined> {
-    shared.draft = execRes;
+  async post(shared: SharedState, _: string, draft: string): Promise<string> {
+    shared.draft = draft;
     return "default";
   }
 }
@@ -1998,15 +1847,15 @@ class ReviewAndRefine extends Node<SharedState> {
 
   async post(
     shared: SharedState,
-    prepRes: string,
-    execRes: string
-  ): Promise<string | undefined> {
-    shared.final_article = execRes;
-    return undefined; // No next action, end of flow
+    _: string,
+    final: string
+  ): Promise<undefined> {
+    shared.final_article = final;
+    return undefined;
   }
 }
 
-// Connect nodes
+// Connect nodes in sequence
 const outline = new GenerateOutline();
 const write = new WriteSection();
 const review = new ReviewAndRefine();
@@ -2015,8 +1864,7 @@ outline.next(write).next(review);
 
 // Create and run flow
 const writingFlow = new Flow(outline);
-const shared: SharedState = { topic: "AI Safety" };
-writingFlow.run(shared);
+writingFlow.run({ topic: "AI Safety" });
 ```
 
 For _dynamic cases_, consider using [Agents](./agent.md).
