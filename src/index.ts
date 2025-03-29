@@ -13,7 +13,7 @@ class BaseNode<S = unknown, P extends NonIterableObject = NonIterableObject> {
     return await this._run(shared);
   }
   setParams(params: P): this { this._params = params; return this; }
-  next<T extends BaseNode<S, P>>(node: T): T { this.on("default", node); return node; }
+  next<T extends BaseNode>(node: T): T { this.on("default", node); return node; }
   on(action: Action, node: BaseNode): this {
     if (this._successors.has(action)) console.warn(`Overwriting successor for action '${action}'`);
     this._successors.set(action, node); return this;
