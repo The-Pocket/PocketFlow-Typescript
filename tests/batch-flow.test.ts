@@ -3,9 +3,9 @@ import { Node, BatchFlow } from '../src/index';
 
 // Define shared storage type
 type SharedStorage = {
-  input_data?: Record<string, number>;
+  inputData?: Record<string, number>;
   results?: Record<string, number>;
-  intermediate_results?: Record<string, number>;
+  intermediateResults?: Record<string, number>;
 };
 
 // Parameters type
@@ -21,7 +21,7 @@ class AsyncDataProcessNode extends Node<SharedStorage, BatchParams> {
 
   async prep(shared: SharedStorage): Promise<number> {
     const key = this._params.key;
-    const data = shared.input_data?.[key] ?? 0;
+    const data = shared.inputData?.[key] ?? 0;
 
     if (!shared.results) {
       shared.results = {};
@@ -71,7 +71,7 @@ class AsyncErrorNode extends Node<SharedStorage, BatchParams> {
     execRes: any
   ): Promise<string | undefined> {
     const key = this._params.key;
-    if (key === 'error_key') {
+    if (key === 'errorKey') {
       throw new Error(`Async error processing key: ${key}`);
     }
     return 'processed';
@@ -88,12 +88,12 @@ describe('BatchFlow Tests', () => {
   test('basic async batch processing', async () => {
     class SimpleTestBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
-        return Object.keys(shared.input_data || {}).map((k) => ({ key: k }));
+        return Object.keys(shared.inputData || {}).map((k) => ({ key: k }));
       }
     }
 
     const shared: SharedStorage = {
-      input_data: {
+      inputData: {
         a: 1,
         b: 2,
         c: 3,
@@ -117,7 +117,7 @@ describe('BatchFlow Tests', () => {
         if (!shared.results) {
           shared.results = {};
         }
-        return Object.keys(shared.input_data || {}).map((k) => ({ key: k }));
+        return Object.keys(shared.inputData || {}).map((k) => ({ key: k }));
       }
 
       // Ensure post is called even if batch is empty
@@ -134,7 +134,7 @@ describe('BatchFlow Tests', () => {
     }
 
     const shared: SharedStorage = {
-      input_data: {},
+      inputData: {},
     };
 
     const flow = new EmptyTestBatchFlow(processNode);
@@ -146,15 +146,15 @@ describe('BatchFlow Tests', () => {
   test('async error handling', async () => {
     class ErrorTestBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
-        return Object.keys(shared.input_data || {}).map((k) => ({ key: k }));
+        return Object.keys(shared.inputData || {}).map((k) => ({ key: k }));
       }
     }
 
     const shared: SharedStorage = {
-      input_data: {
-        normal_key: 1,
-        error_key: 2,
-        another_key: 3,
+      inputData: {
+        normalKey: 1,
+        errorKey: 2,
+        anotherKey: 3,
       },
     };
 
@@ -162,7 +162,7 @@ describe('BatchFlow Tests', () => {
 
     await expect(async () => {
       await flow.run(shared);
-    }).rejects.toThrow('Async error processing key: error_key');
+    }).rejects.toThrow('Async error processing key: errorKey');
   });
 
   test('nested async flow', async () => {
@@ -182,13 +182,13 @@ describe('BatchFlow Tests', () => {
       ): Promise<string | undefined> {
         const key = this._params.key;
 
-        if (!shared.intermediate_results) {
-          shared.intermediate_results = {};
+        if (!shared.intermediateResults) {
+          shared.intermediateResults = {};
         }
 
-        // Safely access input_data
-        const inputValue = shared.input_data?.[key] ?? 0;
-        shared.intermediate_results[key] = inputValue + 1;
+        // Safely access inputData
+        const inputValue = shared.inputData?.[key] ?? 0;
+        shared.intermediateResults[key] = inputValue + 1;
 
         await new Promise((resolve) => setTimeout(resolve, 10));
         return 'next';
@@ -215,11 +215,11 @@ describe('BatchFlow Tests', () => {
           shared.results = {};
         }
 
-        if (!shared.intermediate_results) {
-          shared.intermediate_results = {};
+        if (!shared.intermediateResults) {
+          shared.intermediateResults = {};
         }
 
-        shared.results[key] = shared.intermediate_results[key] * 2;
+        shared.results[key] = shared.intermediateResults[key] * 2;
         await new Promise((resolve) => setTimeout(resolve, 10));
         return 'done';
       }
@@ -227,7 +227,7 @@ describe('BatchFlow Tests', () => {
 
     class NestedBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
-        return Object.keys(shared.input_data || {}).map((k) => ({ key: k }));
+        return Object.keys(shared.inputData || {}).map((k) => ({ key: k }));
       }
     }
 
@@ -237,7 +237,7 @@ describe('BatchFlow Tests', () => {
     innerNode.on('next', outerNode);
 
     const shared: SharedStorage = {
-      input_data: {
+      inputData: {
         x: 1,
         y: 2,
       },
@@ -276,8 +276,8 @@ describe('BatchFlow Tests', () => {
           shared.results = {};
         }
 
-        // Safely access input_data with default value
-        const inputValue = shared.input_data?.[key] ?? 0;
+        // Safely access inputData with default value
+        const inputValue = shared.inputData?.[key] ?? 0;
         shared.results[key] = inputValue * multiplier;
 
         return 'done';
@@ -286,7 +286,7 @@ describe('BatchFlow Tests', () => {
 
     class CustomParamBatchFlow extends BatchFlow<SharedStorage, BatchParams> {
       async prep(shared: SharedStorage): Promise<BatchParams[]> {
-        return Object.keys(shared.input_data || {}).map((k, i) => ({
+        return Object.keys(shared.inputData || {}).map((k, i) => ({
           key: k,
           multiplier: i + 1,
         }));
@@ -294,7 +294,7 @@ describe('BatchFlow Tests', () => {
     }
 
     const shared: SharedStorage = {
-      input_data: {
+      inputData: {
         a: 1,
         b: 2,
         c: 3,

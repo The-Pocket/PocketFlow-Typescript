@@ -3,33 +3,33 @@ import { Node, BatchNode, Flow } from '../src/index';
 
 // Define shared storage type
 type SharedStorage = {
-  input_array?: number[];
-  chunk_results?: number[];
+  inputArray?: number[];
+  chunkResults?: number[];
   total?: number;
   result?: string;
-  parallel_results?: number[];
-  completion_order?: number[];
+  parallelResults?: number[];
+  completionOrder?: number[];
 };
 
 class AsyncArrayChunkNode extends BatchNode<SharedStorage> {
-  private chunk_size: number;
+  private chunkSize: number;
 
   constructor(
-    chunk_size: number = 10,
+    chunkSize: number = 10,
     maxRetries: number = 1,
     wait: number = 0
   ) {
     super(maxRetries, wait);
-    this.chunk_size = chunk_size;
+    this.chunkSize = chunkSize;
   }
 
   async prep(shared: SharedStorage): Promise<number[][]> {
     // Get array from shared storage and split into chunks
-    const array = shared.input_array || [];
+    const array = shared.inputArray || [];
     const chunks: number[][] = [];
 
-    for (let start = 0; start < array.length; start += this.chunk_size) {
-      const end = Math.min(start + this.chunk_size, array.length);
+    for (let start = 0; start < array.length; start += this.chunkSize) {
+      const end = Math.min(start + this.chunkSize, array.length);
       chunks.push(array.slice(start, end));
     }
 
@@ -48,7 +48,7 @@ class AsyncArrayChunkNode extends BatchNode<SharedStorage> {
     execRes: number[]
   ): Promise<string | undefined> {
     // Store chunk results in shared storage
-    shared.chunk_results = execRes;
+    shared.chunkResults = execRes;
     return 'processed';
   }
 }
@@ -60,7 +60,7 @@ class AsyncSumReduceNode extends Node<SharedStorage> {
 
   async prep(shared: SharedStorage): Promise<number[]> {
     // Get chunk results from shared storage
-    return shared.chunk_results || [];
+    return shared.chunkResults || [];
   }
 
   async exec(chunkResults: number[]): Promise<number> {
@@ -87,7 +87,7 @@ class ErrorBatchNode extends BatchNode<SharedStorage> {
   }
 
   async prep(shared: SharedStorage): Promise<number[]> {
-    return shared.input_array || [];
+    return shared.inputArray || [];
   }
 
   async exec(item: number): Promise<number> {
@@ -102,13 +102,13 @@ describe('BatchNode Tests', () => {
   test('array chunking', async () => {
     // Test that the array is correctly split into chunks and processed asynchronously
     const shared: SharedStorage = {
-      input_array: Array.from({ length: 25 }, (_, i) => i), // [0,1,2,...,24]
+      inputArray: Array.from({ length: 25 }, (_, i) => i), // [0,1,2,...,24]
     };
 
     const chunkNode = new AsyncArrayChunkNode(10);
     await chunkNode.run(shared);
 
-    expect(shared.chunk_results).toEqual([45, 145, 110]); // Sum of chunks [0-9], [10-19], [20-24]
+    expect(shared.chunkResults).toEqual([45, 145, 110]); // Sum of chunks [0-9], [10-19], [20-24]
   });
 
   test('async map-reduce sum', async () => {
@@ -117,7 +117,7 @@ describe('BatchNode Tests', () => {
     const expectedSum = array.reduce((sum, val) => sum + val, 0); // 4950
 
     const shared: SharedStorage = {
-      input_array: array,
+      inputArray: array,
     };
 
     // Create nodes
@@ -136,12 +136,12 @@ describe('BatchNode Tests', () => {
 
   test('uneven chunks', async () => {
     // Test that the async map-reduce works correctly with array lengths
-    // that don't divide evenly by chunk_size
+    // that don't divide evenly by chunkSize
     const array = Array.from({ length: 25 }, (_, i) => i);
     const expectedSum = array.reduce((sum, val) => sum + val, 0); // 300
 
     const shared: SharedStorage = {
-      input_array: array,
+      inputArray: array,
     };
 
     const chunkNode = new AsyncArrayChunkNode(10);
@@ -160,10 +160,10 @@ describe('BatchNode Tests', () => {
     const expectedSum = array.reduce((sum, val) => sum + val, 0);
 
     const shared: SharedStorage = {
-      input_array: array,
+      inputArray: array,
     };
 
-    // Use chunk_size=15 instead of default 10
+    // Use chunkSize=15 instead of default 10
     const chunkNode = new AsyncArrayChunkNode(15);
     const reduceNode = new AsyncSumReduceNode();
 
@@ -175,12 +175,12 @@ describe('BatchNode Tests', () => {
   });
 
   test('single element chunks', async () => {
-    // Test extreme case where chunk_size=1
+    // Test extreme case where chunkSize=1
     const array = Array.from({ length: 5 }, (_, i) => i);
     const expectedSum = array.reduce((sum, val) => sum + val, 0);
 
     const shared: SharedStorage = {
-      input_array: array,
+      inputArray: array,
     };
 
     const chunkNode = new AsyncArrayChunkNode(1);
@@ -196,7 +196,7 @@ describe('BatchNode Tests', () => {
   test('empty array', async () => {
     // Test edge case of empty input array
     const shared: SharedStorage = {
-      input_array: [],
+      inputArray: [],
     };
 
     const chunkNode = new AsyncArrayChunkNode(10);
@@ -212,7 +212,7 @@ describe('BatchNode Tests', () => {
   test('error handling', async () => {
     // Test error handling in async batch processing
     const shared: SharedStorage = {
-      input_array: [1, 2, 3],
+      inputArray: [1, 2, 3],
     };
 
     const errorNode = new ErrorBatchNode();
@@ -291,8 +291,8 @@ describe('BatchNode Tests', () => {
         prepRes: number[],
         execRes: number[]
       ): Promise<string | undefined> {
-        shared.parallel_results = execRes;
-        shared.completion_order = [...completed];
+        shared.parallelResults = execRes;
+        shared.completionOrder = [...completed];
         return undefined;
       }
     }
@@ -303,10 +303,10 @@ describe('BatchNode Tests', () => {
     await parallelNode.run(shared);
 
     // Check that results contain all processed items
-    expect(shared.parallel_results?.sort()).toEqual([1, 2, 3, 4, 5]);
+    expect(shared.parallelResults?.sort()).toEqual([1, 2, 3, 4, 5]);
 
     // Check that items were not necessarily processed in order
     // Higher numbered items should complete before lower ones due to the delay logic
-    expect(shared.completion_order).not.toEqual([1, 2, 3, 4, 5]);
+    expect(shared.completionOrder).not.toEqual([1, 2, 3, 4, 5]);
   });
 });
