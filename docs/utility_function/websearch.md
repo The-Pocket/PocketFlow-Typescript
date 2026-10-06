@@ -414,3 +414,11 @@ serpApiSearch("electric vehicles", SERPAPI_KEY)
     console.error("Search failed:", error);
   });
 ```
+
+## PocketFlow search flow with MCP
+
+For a runnable example that connects web search to PocketFlow's Node and Flow
+classes, see the [Parallel Search MCP cookbook](https://github.com/The-Pocket/PocketFlow-Typescript/tree/main/cookbook/pocketflow-parallel-search).
+It uses anonymous Streamable HTTP access and prints search excerpts with source
+URLs. The example has its own setup and dependencies; run it explicitly to use
+this search service.

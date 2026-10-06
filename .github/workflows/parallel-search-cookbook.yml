@@ -1,0 +1,36 @@
+name: Parallel search cookbook
+
+on:
+  pull_request:
+    paths:
+      - "cookbook/pocketflow-parallel-search/**"
+      - "src/**"
+      - "package*.json"
+      - ".github/workflows/parallel-search-cookbook.yml"
+  push:
+    branches: [main, master]
+    paths:
+      - "cookbook/pocketflow-parallel-search/**"
+      - "src/**"
+      - "package*.json"
+      - ".github/workflows/parallel-search-cookbook.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: cookbook/pocketflow-parallel-search
+      - run: npm run typecheck
+        working-directory: cookbook/pocketflow-parallel-search
+      - run: npm test
+        working-directory: cookbook/pocketflow-parallel-search
